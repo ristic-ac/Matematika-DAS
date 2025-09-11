@@ -1,0 +1,15 @@
+# Core data & modeling
+pandas            # data frames & I/O
+numpy             # numerical arrays
+
+# Machine learning
+scikit-learn      # tree & GB implementations
+scipy             # dependency of scikit-learn
+joblib            # dependency of scikit-learn
+threadpoolctl     # dependency of scikit-learn
+xgboost           # gradient boosting surrogate
+
+# Logic & explainability
+pyswip            # Python ↔ SWI-Prolog bridge
+pyyaml            # config & metadata serialization
+tqdm              # progress bars
