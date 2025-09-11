@@ -1,0 +1,77 @@
+\section{Примери}
+У овом поглављу су приказани примери исцртавања програмског кода, фигуре и табеле у оквиру документа. Сврха примера је да вам олакша рад са \LaTeX-ом уколико раније нисте радили са њим. Примери су само референтни и можете изабрати и друге пакете за исцртавање од оних који су коришћени у примерима.
+
+Још примера цитирања референци \cite{kamran2101rv, yatsura2021metalearning}.
+
+
+\subsection{Пример приказа програмског кода коришћењем \texttt{minted} пакета}
+Коришћењем команди minted пакета, могуће је исцртати код као посебан блок или у склопу текста (\textit{inline} режим). Изворни код се може задати директно или учитати из датотеке.
+
+\subsubsection{Исцртавање изворног кода из датотеке}
+\inputpython{kodovi/helloworld.py}{Пример python кода}{code:helloworldpy}
+Пример \ref{code:helloworldpy} Python изворног кода је добијен коришћењем \LaTeX команде \texttt{inputpython} дефинисане у датотеци \texttt{rsvp.sty}. Команда је омотач за \texttt{inputminted} команду са бојењем за Python програмски језик и нумерисање изворних кодова како би се могли референцирати и додати у листу свих изворних кодова. Имплементирани су још и омотачи за C и C++ програмске језике. По узору на имплементиране можете додати и своје омотаче. 
+
+\begin{listing}
+\inputminted{c}{kodovi/helloworld.c}
+\caption{Пример \texttt{C} кода}
+\label{code:helloworldc}
+\end{listing}
+Код за испис примера \ref{code:helloworldc} показује како можете исцртати изворни код у C програмском језику без коришћења омотача из \texttt{rsvp.sty} датотеке. Може бити корисно уколико желите финију контролу над исцртавањем кода коју омотачи не поджавају.
+
+\subsubsection{Исцртавање блока изворног кода}
+\begin{pythoncode}{Још један пример исцртавања \texttt{python} изворног кода}{code:hellowpyblock}
+def hello_world():
+    print("Hello world!")
+
+
+if __name__ == '__main__':
+    hello_world()
+\end{pythoncode}
+
+\begin{listing}
+\begin{minted}{c}
+#include <stdio.h>
+
+void hello_world() {
+    printf("Hello world!");
+}
+
+int main() {
+
+    hello_world();
+
+    return 0;
+}
+\end{minted}
+\caption{Још један пример C изворног кода}
+\label{code:hellowcblock}
+\end{listing}
+
+Изворни код \ref{code:hellowpyblock} је исцртан коришћењем \texttt{pythoncode} окружења, док је изворни код \ref{code:hellowcblock} исцртан без коришћења омотача.
+
+\subsubsection{Исцртавање \textit{inline} изворног кода}
+Код може бити исцртан и у оквиру текста са или без коришћења омотача. Нпр. \pythoninline{import os}, тј. \mintinline{c}{#include <stdio.h>}.
+
+\subsection{Пример приказа фигуре коришћењем \texttt{graphicx} пакета}
+Овде је приказано како исцртати и референцирати се на фигуру која садржи центрирану, нескалирану слику (нпр. слика \ref{fig:ftnlogo}).
+\begin{figure}[H]
+    \centering
+    \includegraphics{images/ftn-logo.eps}
+    \caption{ФТН лого}
+    \label{fig:ftnlogo}
+\end{figure}
+
+
+\subsection{Пример приказа табеле коришћењем \texttt{tabular} пакета}
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ccccc@{}}    % c значи да ће садржај ћелија табеле бити центриран
+\toprule
+колона 1 & колона 2 & колона 3 & колона 4 & колона 5 \\ \midrule\midrule
+1 & 1 & 1 & 1 & 1 \\
+1 & 1 & 1 & 1 & 1 \\
+1 & 1 & 1 & 1 & 1 \\ \bottomrule
+\end{tabular}
+\caption{Пример табеле са заглављем}
+\label{table:example1}
+\end{table}
