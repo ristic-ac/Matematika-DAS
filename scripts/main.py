@@ -34,8 +34,6 @@ def run_aleph_with_files(model_type, dataset = "mushroom"):
         cleaned = clean_aleph_program(program, out_path=os.path.join(base_dir, f"{dataset}_hypothesis.pl"))
         for c in cleaned:
             print(c)
-        
-        row_pos = list(prolog.query(f"aleph:test('{test_pos_file}', noshow, TP, P, _)"))[0]
     else:
         print("No hypothesis term.")
 
