@@ -26,6 +26,8 @@ RUN mkdir -p /app/scripts /app/outputs
 RUN pip install xgboost
 
 RUN pip install --no-cache-dir pyarrow
+
+RUN pip install --no-cache-dir seaborn matplotlib
 # Note: To bind the host's ./scripts folder (where the Dockerfile is) to /app/scripts in the container,
 # run the container with:
 #   docker run -v $(pwd)/scripts:/app/scripts -v $(pwd)/output:/app/output ...

@@ -63,7 +63,6 @@ def _split_top_level_commas(s: str, expected_parts: int):
             buf.append(ch)
     parts.append("".join(buf).strip())
     if len(parts) != expected_parts:
-        # Fallback: pad or merge to reach expected_parts
         if len(parts) > expected_parts:
             # merge extras into last
             head = parts[:expected_parts-1]
@@ -74,22 +73,18 @@ def _split_top_level_commas(s: str, expected_parts: int):
     return parts
 
 def _normalize_head(head_str: str) -> str:
+    """Normalize clause head to keep predicate name but replace arg with A."""
     head_str = head_str.strip()
-    # Expect pred_edible(<var>)
-    if head_str.startswith("pred_edible("):
-        return "pred_edible(A)"
-    # If it’s already quoted functor or something odd, do a best effort
-    # Try to get content inside the first '('
     if "(" in head_str and head_str.endswith(")"):
         fun = head_str.split("(", 1)[0].strip().strip("'")
         return f"{fun}(A)"
-    return "pred_edible(A)"  # safe default
+    return "pred_unknown(A)"  # fallback
 
 def _parse_feature_literal(lit: str) -> str:
     # Expect feature(<var>, <feat>, <val>)
     lit = lit.strip()
     if not lit.startswith("feature("):
-        return lit  # leave unknown literals untouched
+        return lit
     inside, _ = _extract_paren_content(lit, lit.find("("))
     a0, a1, a2 = _split_top_level_commas(inside, 3)
     a1, a2 = a1.strip(), a2.strip()
@@ -103,41 +98,33 @@ def _flatten_body(body_str: str):
     """
     s = _strip_enclosing_parens(body_str.strip())
 
-    # Case 1: explicit conjunction functor ",( ... )"
     if s.startswith(",("):
-        inside, _ = _extract_paren_content(s, 1)  # index of '(' after ','
+        inside, _ = _extract_paren_content(s, 1)
         left, right = _split_top_level_once(inside)
         return _flatten_body(left) + _flatten_body(right)
 
-    # Case 2: top-level comma between two chunks (e.g., "feature(...), ,( ... )")
     left, right = _split_top_level_once(s)
     if right is not None and not s.startswith("feature("):
         return _flatten_body(left) + _flatten_body(right)
 
-    # Case 3: single literal or parenthesized literal
     s = _strip_enclosing_parens(s)
     if s == "true" or s == "":
         return []
     return [_parse_feature_literal(s)]
 
-def clean_aleph_clause(clause_str: str) -> str:
+def clean_aleph_clause(clause_str: str) -> str | None:
     """
-    Transform Aleph clause term string into:
-      pred_edible(A) :- feature(A, feat, val), feature(A, feat, val).
-    Or a fact:
-      pred_edible(A).
+    Transform Aleph clause term string into cleaned Prolog-style rule:
+      pred(A) :- feature(A, feat, val), feature(A, feat, val).
+    Returns None if it's just a fact (e.g., pred(A).).
     """
     s = _strip_quotes_and_period(clause_str)
 
-    # Clause of the form ':- (Head, Body)' or "':-(Head, Body)"
-    # Accept both ":-(" and "':-(" prefixes
     s_ = s[1:] if s.startswith("'") else s
     if s_.startswith(":-"):
-        # find first '(' after ':-'
         idx = s_.find("(")
         if idx == -1:
-            # malformed; fall back
-            return "pred_edible(A)."
+            return None  # malformed, treat as skipped
         inner, _ = _extract_paren_content(s_, idx)
         head_str, body_str = _split_top_level_once(inner)
         head = _normalize_head(head_str)
@@ -145,19 +132,21 @@ def clean_aleph_clause(clause_str: str) -> str:
         if body_lits:
             return f"{head} :- {', '.join(body_lits)}."
         else:
-            return f"{head}."
+            return None  # skip head-only rule
     else:
-        # Fact like "pred_edible(_2044)" (no body)
-        head = _normalize_head(s)
-        return f"{head}."
+        # fact-only clause — skip
+        return None
 
 def clean_aleph_program(program_terms, out_path=None):
     """
-    program_terms: iterable of clause terms from induce(Program) (strings/objects)
-    out_path: optional file to write to
-    returns list of cleaned clause strings
+    Keep only *rules* (no facts).
     """
-    cleaned = [clean_aleph_clause(str(t)) for t in program_terms]
+    cleaned = []
+    for t in program_terms:
+        clause = clean_aleph_clause(str(t))
+        if clause is not None:
+            cleaned.append(clause)
+
     if out_path:
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w") as f:
