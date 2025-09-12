@@ -163,7 +163,7 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     X_enc_df = pd.DataFrame(X_enc, index=X.index, columns=X.columns)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X_enc_df, y, test_size=0.3, random_state=42, stratify=y
+        X_enc_df, y, test_size=0.15, random_state=3, stratify=y
     )
 
     # Print number of samples in train and test sets
@@ -277,9 +277,9 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         clf, y_test, y_pred, outdir, model_type, X
     )
 
-    # Stable IDs for test set
-    test_ids = [f"m{i+1}" for i in range(len(X_test))]
-    id_map = pd.Series(test_ids, index=X_test.index)
+    # Stable IDs for all examples (train + test)
+    all_ids = [f"m{i+1}" for i in range(len(X))]
+    id_map = pd.Series(all_ids, index=X.index)
 
     pred_label = 'edible' if dataset == "mushroom" else 'gt_50K'
 
@@ -305,7 +305,7 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         # f":- aleph_set(clauses, {clauses}).",      # Set max number of clauses in hypothesis
         # "%:- aleph_set(i, 4).",            # https://www.swi-prolog.org/pack/file_details/aleph/doc/manual.html#manual, Controls how many new variables Aleph is allowed to introduce in a clause body
         # f":- aleph_set(nodes, {nodes}).",  # Set max number of nodes explored
-        f":- aleph_set(noise, {noise}).",  # Allow up to {noise} negative examples per clause
+        # f":- aleph_set(noise, {noise}).",  # Allow up to {noise} negative examples per clause
         # f":- aleph_set(evalfn, {evalfn}).",  # Set evaluation function
         # f":- aleph_set(search, {search_strategy}).",  # Set search strategy
         # f":- aleph_set(minpos, {minpos}).",  # Minimum positive examples a clause must cover
@@ -316,9 +316,9 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         ""
     ]
 
-    # Background facts with ORIGINAL (unencoded) X for TRAINING data
+    # Build complete background knowledge (training + testing)
     bg = [":- begin_bg."]
-    for orig_idx in X_train.index:
+    for orig_idx in X.index:  # X_full = training + testing data
         mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
         row = X.loc[orig_idx]
         for col, val in row.items():
@@ -339,23 +339,23 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     pos.append(":- end_in_pos.\n")
     neg.append(":- end_in_neg.\n")
 
-    # Write Aleph training program
+    # Write Aleph training program with full BG + training pos/neg
     with open(pl_path, "w") as f:
         f.write("\n".join(header + bg + pos + neg))
-
     print("Aleph training program written to:", pl_path)
 
-    # Write positive examples into test.f for Aleph testing
+    # Write positive test examples into test.f
     test_f_path = os.path.join(outdir, f'{dataset}_test.f')
     with open(test_f_path, "w") as f:
         f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 1]))
     print("Positive test examples written to:", test_f_path)
 
-    # Write negative examples into test.n for Aleph testing
+    # Write negative test examples into test.n
     test_n_path = os.path.join(outdir, f'{dataset}_test.n')
     with open(test_n_path, "w") as f:
         f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
     print("Negative test examples written to:", test_n_path)
+
 
     # Save best hyperparameters to a file
     params_path = os.path.join(outdir, 'best_params.txt')
