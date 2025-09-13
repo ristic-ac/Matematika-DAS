@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 # scripts/train_and_export_aleph_single.py
 
-import os, re, joblib
+import os
+import re
+import sys
+import joblib
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import sys
-import seaborn as sns
-import os
-import matplotlib.pyplot as plt
 
 def _to_atom(s: str) -> str:
     """
@@ -33,34 +35,59 @@ def _to_atom(s: str) -> str:
         s = 'v_' + s
     return s.lower()
 
-def save_and_print_confusion_matrix_and_importances(clf, y_test, y_pred, outdir, model_type, X, y_le=None):
-    # Save and print the confusion matrix
-    import matplotlib.pyplot as plt
-
-    cm = confusion_matrix(y_test, y_pred)
-    print("Confusion Matrix:")
-    print(cm)
-    plt.figure(figsize=(6, 5))
-    xticklabels = clf.classes_ if hasattr(clf, "classes_") else y_le.classes_ if y_le is not None else None
-    yticklabels = clf.classes_ if hasattr(clf, "classes_") else y_le.classes_ if y_le is not None else None
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=xticklabels,
-                yticklabels=yticklabels)
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title(f'Confusion Matrix ({model_type.upper()})')
-    cm_path = os.path.join(outdir, 'confusion_matrix.png')
-    plt.savefig(cm_path)
-    plt.close()
-    print("Confusion matrix saved to:", cm_path)
-
-    # Print feature importances for the model used
+def save_feature_importances(clf, X, outdir, model_type):
+    """
+    Save and print feature importances for supported models.
+    """
     if model_type in ["dt", "rf", "xgb"]:
         importances = clf.feature_importances_
         feature_names = X.columns
         feat_imp = pd.Series(importances, index=feature_names).sort_values(ascending=False)
         print("Feature importances:")
         print(feat_imp)
+        # Optionally, save to file
+        imp_path = os.path.join(outdir, 'feature_importances.csv')
+        feat_imp.to_csv(imp_path, header=True)
+        print("Feature importances saved to:", imp_path)
+
+def save_and_print_confusion_matrix_model(clf, y_test, y_pred, outdir, model_type, dataset=None):
+    y_pred = [int(x) for x in y_pred]
+    y_test = [int(x) for x in y_test]
+
+    if dataset == "mushroom":
+        labels = [0, 1]
+        custom_labels = ["poisonous", "edible"]
+    elif dataset == "adult":
+        labels = [0, 1]
+        custom_labels = ["lte_50K", "gt_50K"]
+    else:
+        labels = sorted(set(y_test))
+        custom_labels = [str(c) for c in (getattr(clf, "classes_", labels))]
+
+    label_map = dict(zip(labels, custom_labels))
+    y_pred_labels = [label_map[x] for x in y_pred]
+    y_test_labels = [label_map[x] for x in y_test]
+
+    # Switch order of custom_labels to swap TP and TN
+    custom_labels_swapped = custom_labels[::-1]
+
+    cm_raw = confusion_matrix(y_test_labels, y_pred_labels, labels=custom_labels_swapped)
+    df_cm = pd.DataFrame(cm_raw, index=custom_labels_swapped, columns=custom_labels_swapped)
+
+    print("Confusion Matrix:")
+    print(df_cm)
+
+    plt.figure(figsize=(6, 5))
+    ax = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues')
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+    ax.set_title(f'Confusion Matrix ({model_type.upper()}) for {dataset.capitalize() if dataset else "Dataset"}')
+
+    os.makedirs(outdir, exist_ok=True)
+    cm_path = os.path.join(outdir, 'confusion_matrix_model.png')
+    plt.savefig(cm_path, bbox_inches="tight")
+    plt.close()
+    print("Confusion matrix saved to:", cm_path)
 
 def plot_feature_correlation_heatmap(X, dataset):
     """
@@ -102,10 +129,43 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         df.to_parquet(cache_path)
         print(f"Cached {dataset.capitalize()} dataset at {cache_path}.")
 
-    # Split
-    X = df.drop('class', axis=1)     # categorical
-    y = df['class']                  # 'e' or 'p'
+    # Split features and target
+    X = df.drop('class', axis=1)
+    y = df['class']
 
+    # Check output class distribution
+    print("Class distribution:")
+    print(y.value_counts())
+
+    # Get whichever class is minority
+    minority_class = y.value_counts().idxmin()
+    minority_count = y.value_counts().min()
+    print(f"Minority class: {minority_class} with {minority_count} samples.")
+    # Make sure equal size classes
+    if y.value_counts().nunique() > 1:
+        print("Balancing classes by downsampling majority class...")
+        df_minority = df[y == minority_class]
+        df_majority = df[y != minority_class].sample(n=minority_count, random_state=42)
+        df = pd.concat([df_minority, df_majority]).sample(frac=1, random_state=42).reset_index(drop=True)
+        X = df.drop('class', axis=1)
+        y = df['class']
+        print("New class distribution:")
+        print(y.value_counts())
+        user_input = input("Classes balanced. Press Enter to proceed with training, or 'q' to exit: ")
+        if user_input.strip().lower() == 'q':
+            print("Exiting as requested.")
+            sys.exit(0)
+    else:
+        print("Classes are already balanced.")
+        user_input = input("Press Enter to proceed with training, or 'q' to exit: ")
+        if user_input.strip().lower() == 'q':
+            print("Exiting as requested.")
+            sys.exit(0)
+    
+    # Print class distribution after balancing
+    print("Final class distribution:")
+    print(y.value_counts())
+    
     plot_feature_correlation_heatmap(X, dataset)
 
     # Custom binning for Adult dataset
@@ -156,6 +216,27 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         fnlwgt_bins = X["fnlwgt"].quantile([0, 0.25, 0.5, 0.75, 1.0]).values
         fnlwgt_labels = ["Q1", "Q2", "Q3", "Q4"]
         X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins, labels=fnlwgt_labels, include_lowest=True)
+
+    # If feature_importances.csv exists, load and keep only top 90%
+    outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
+    imp_path = os.path.join(outdir, 'feature_importances.csv')
+    if os.path.exists(imp_path):
+        print(f"Loading feature importances from {imp_path} to select top features...")
+        feat_imp = pd.read_csv(imp_path, index_col=0)
+        if feat_imp.shape[1] == 1:
+            feat_imp = feat_imp.iloc[:, 0]
+        feat_imp = feat_imp.sort_values(ascending=False)
+        cum_importance = feat_imp.cumsum() / feat_imp.sum()
+        top_features = cum_importance[cum_importance <= 0.9].index.tolist()
+        print("Top features and their importances:")
+        print(feat_imp.loc[top_features])
+        X = X[top_features]
+        print(f"Selected top {len(top_features)} features covering 90% importance.")
+        print("Total sum of importances for selected features:", feat_imp.loc[top_features].sum())
+        user_input = input("Top features selected. Press Enter to proceed with training on top features, or 'q' to exit: ")
+        if user_input.strip().lower() == 'q':
+            print("Exiting as requested.")
+            sys.exit(0)
 
     # Keep original X for ILP; encode only for sklearn
     enc = OrdinalEncoder()
@@ -273,9 +354,15 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     os.makedirs(outdir, exist_ok=True)
     pl_path = os.path.join(outdir, f"{dataset}.pl")
 
-    save_and_print_confusion_matrix_and_importances(
-        clf, y_test, y_pred, outdir, model_type, X
+    save_and_print_confusion_matrix_model(
+        clf, y_test, y_pred, outdir, model_type, dataset
     )
+
+    # Only save feature importances if the file does not already exist
+    if not os.path.exists(os.path.join(outdir, 'feature_importances.csv')):
+        save_feature_importances(clf, X, outdir, model_type)
+        print("Feature importances computed and saved. Exiting to allow re-run with top features only.")
+        sys.exit(0)
 
     # Stable IDs for all examples (train + test)
     all_ids = [f"m{i+1}" for i in range(len(X))]
@@ -288,7 +375,7 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     # The following lines configure Aleph's behavior and search parameters.
     clauses = 1
     clause_length = 5
-    nodes = 50000
+    nodes = 1000
     # Set noise as 5% of the dataset size (rounded to nearest integer)
     NOISE_PERCENTAGE = 0.05
     noise = int(round(NOISE_PERCENTAGE * len(df)))
@@ -301,11 +388,11 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         ":- use_module(library(aleph)).",  # Load Aleph library
         ":- aleph.",                       # Initialize Aleph
         f":- aleph_set(verbose, {verbose}).",      # (Optional) Set verbosity: 0=silent, 1=normal, 2=verbose
-        # f":- aleph_set(clause_length, {clause_length}).", # Set max clause length
+        f":- aleph_set(clause_length, {clause_length}).", # Set max clause length
         # f":- aleph_set(clauses, {clauses}).",      # Set max number of clauses in hypothesis
         # "%:- aleph_set(i, 4).",            # https://www.swi-prolog.org/pack/file_details/aleph/doc/manual.html#manual, Controls how many new variables Aleph is allowed to introduce in a clause body
-        # f":- aleph_set(nodes, {nodes}).",  # Set max number of nodes explored
-        # f":- aleph_set(noise, {noise}).",  # Allow up to {noise} negative examples per clause
+        f":- aleph_set(nodes, {nodes}).",  # Set max number of nodes explored
+        f":- aleph_set(noise, {noise}).",  # Allow up to {noise} negative examples per clause
         # f":- aleph_set(evalfn, {evalfn}).",  # Set evaluation function
         # f":- aleph_set(search, {search_strategy}).",  # Set search strategy
         # f":- aleph_set(minpos, {minpos}).",  # Minimum positive examples a clause must cover
@@ -356,6 +443,17 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
     print("Negative test examples written to:", test_n_path)
 
+    # Write test background knowledge into test.b
+    test_b_path = os.path.join(outdir, f'{dataset}_test.b')
+    with open(test_b_path, "w") as f:
+        for orig_idx in y_test.index:
+            mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
+            row = X.loc[orig_idx]
+            for col, val in row.items():
+                ftr = _to_atom(col)
+                v = _to_atom(val)
+                f.write(f"feature({mid}, {ftr}, {v}).\n")
+    print("Test background knowledge written to:", test_b_path)
 
     # Save best hyperparameters to a file
     params_path = os.path.join(outdir, 'best_params.txt')

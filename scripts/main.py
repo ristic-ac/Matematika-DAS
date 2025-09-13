@@ -1,9 +1,9 @@
 import os
 import sys
 from pyswip import Prolog
+from rule_check import compute_confusion_for_folder, plot_confusion_matrix_distillate, print_confusion_matrix_distillate
 from train_and_export import train_and_export_aleph_single
 from rules import clean_aleph_program
-import re
 
 def run_aleph_with_files(model_type, dataset = "mushroom"):
     """
@@ -34,6 +34,9 @@ def run_aleph_with_files(model_type, dataset = "mushroom"):
         cleaned = clean_aleph_program(program, out_path=os.path.join(base_dir, f"{dataset}_hypothesis.pl"))
         for c in cleaned:
             print(c)
+        metrics = compute_confusion_for_folder(base_dir, dataset)
+        print_confusion_matrix_distillate(metrics)
+        plot_confusion_matrix_distillate(metrics, outdir=base_dir, model_type=model, dataset=dataset)
     else:
         print("No hypothesis term.")
 
