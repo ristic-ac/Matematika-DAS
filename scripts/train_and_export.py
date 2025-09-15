@@ -18,6 +18,36 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
+# --- Model zoo ---
+models = {
+    "dt": (
+        DecisionTreeClassifier(random_state=42),
+        {
+            "max_depth": [2, 4, 6, 8, 10],
+            "min_samples_leaf": [1, 2, 5, 10],
+            "criterion": ["gini", "entropy"],
+        },
+    ),
+    "rf": (
+        RandomForestClassifier(random_state=42, n_jobs=-1),
+        {
+            "n_estimators": [50, 100, 200],
+            "max_depth": [None, 5, 10, 20],
+            "min_samples_leaf": [1, 2, 5],
+            "criterion": ["gini", "entropy"],
+        },
+    ),
+    "xgb": (
+        XGBClassifier(eval_metric="logloss", random_state=42),
+        {
+            "n_estimators": [50, 100, 200],
+            "max_depth": [3, 5, 7],
+            "learning_rate": [0.01, 0.1, 0.2],
+            "subsample": [0.8, 1.0],
+        },
+    ),
+}
+
 def _to_atom(s: str) -> str:
     """
     Converts a given string to a valid atom name by replacing non-alphanumeric characters with underscores,
@@ -133,9 +163,37 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     X = df.drop('class', axis=1)
     y = df['class']
 
+    # Describe dataset
+    print(f"Dataset: {dataset.capitalize()}")
+    print(f"Number of samples: {len(df)}")
+    print(f"Number of features: {X.shape[1]}")
+    print("Feature types:")
+    print(X.dtypes)
+    print("Summary statistics:")
+    print(X.describe(include='all'))
+    print("Target class distribution:")
+    print(y.value_counts())
+
+    # Drop rows with missing values
+    if X.isnull().any().any():
+        print("Missing values detected. Dropping rows with missing values.")
+        df = df.dropna()
+        X = df.drop('class', axis=1)
+        y = df['class']
+
     # Check output class distribution
     print("Class distribution:")
     print(y.value_counts())
+
+    # Describe numerical fields
+    num_cols = X.select_dtypes(include=[np.number]).columns
+    if len(num_cols) > 0:
+        print("Numerical feature statistics:")
+        print(X[num_cols].describe())
+    else:
+        print("No numerical features found.")
+
+    generate_overlapping_histograms(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type), dataset)
 
     # Get whichever class is minority
     minority_class = y.value_counts().idxmin()
@@ -165,8 +223,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     # Print class distribution after balancing
     print("Final class distribution:")
     print(y.value_counts())
-    
-    plot_feature_correlation_heatmap(X, dataset)
 
     # Custom binning for Adult dataset
     if dataset == "adult":
@@ -259,36 +315,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         y_train = y_train.map({'<=50K': 0, '>50K': 1}).astype(int)
         y_test = y_test.map({'<=50K': 0, '>50K': 1}).astype(int)
 
-    # --- Model zoo ---
-    models = {
-        "dt": (
-            DecisionTreeClassifier(random_state=42),
-            {
-                "max_depth": [2, 4, 6, 8, 10],
-                "min_samples_leaf": [1, 2, 5, 10],
-                "criterion": ["gini", "entropy"],
-            },
-        ),
-        "rf": (
-            RandomForestClassifier(random_state=42, n_jobs=-1),
-            {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [None, 5, 10, 20],
-                "min_samples_leaf": [1, 2, 5],
-                "criterion": ["gini", "entropy"],
-            },
-        ),
-        "xgb": (
-            XGBClassifier(eval_metric="logloss", random_state=42),
-            {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [3, 5, 7],
-                "learning_rate": [0.01, 0.1, 0.2],
-                "subsample": [0.8, 1.0],
-            },
-        ),
-    }
-
     if model_type not in models:
         raise ValueError(f"Unsupported model_type '{model_type}'. Choose from {list(models.keys())}.")
 
@@ -299,33 +325,7 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     os.makedirs(outdir, exist_ok=True)
     params_path = os.path.join(outdir, 'best_params.txt')
 
-    best_params = None
-    if os.path.exists(params_path):
-        # Try to load best params from file
-        best_params = {}
-        with open(params_path, 'r') as f:
-            for line in f:
-                if ':' in line:
-                    k, v = line.strip().split(':', 1)
-                    k = k.strip()
-                    v = v.strip()
-                    # Try to convert to int or float if possible
-                    if v.lower() == "none":
-                        v = None
-                    elif v.lower() == "true":
-                        v = True
-                    elif v.lower() == "false":
-                        v = False
-                    else:
-                        try:
-                            v = int(v)
-                        except ValueError:
-                            try:
-                                v = float(v)
-                            except ValueError:
-                                pass
-                    best_params[k] = v
-
+    best_params = load_best_params(params_path)
     if best_params:
         print(f"Found best_params.txt, using parameters: {best_params}")
         clf = base_model.set_params(**best_params)
@@ -462,3 +462,91 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
             f.write(f"{k}: {v}\n")
     print("Best hyperparameters written to:", params_path)
 
+
+# Function that creates histograms for numerical features in the outdir
+# Name should include dataset name for clarity (e.g., adult_age_histogram.png)
+# X represents the inputs DataFrame, y the target Series
+# Outdir represents the output directory for saving plots
+def generate_overlapping_histograms(X, y, outdir, dataset_name):
+    # Identify numerical columns
+    num_cols = X.select_dtypes(include=[np.number]).columns
+    if len(num_cols) == 0:
+        print("No numerical columns to plot.")
+        return
+
+    # Create overlapping histograms for each numerical column
+    for col in num_cols:
+        plt.figure(figsize=(8, 6))
+        # Compute common bins for all classes
+        data_all = X[col].dropna()
+        bins = np.histogram_bin_edges(data_all, bins=30)
+        for class_value in sorted(y.unique()):
+            sns.histplot(
+            X[y == class_value][col],
+            bins=bins,
+            kde=False,
+            stat="density",
+            label=str(class_value),
+            alpha=0.5
+            )
+        plt.title(f'Overlapping Histogram of {col} ({dataset_name.capitalize()})')
+        plt.xlabel(col)
+        plt.ylabel('Density')
+        plt.legend(title='Class')
+        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_overlap_histogram.png')
+        os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+        plt.savefig(plot_path)
+        plt.close()
+        print(f"Saved overlapping histogram for {col} to {plot_path}")
+
+def load_best_params(params_path):
+    """
+    Load best hyperparameters from a text file.
+
+    The file is expected to contain lines of the form:
+        key: value
+
+    Recognizes “none”, “true”, “false” (case insensitive) and tries to convert
+    numeric strings to int or float.
+
+    Args:
+        params_path (str): Path to the params file.
+
+    Returns:
+        dict or None: Dictionary of parameters if file exists and is parseable, else None.
+    """
+    if not os.path.exists(params_path):
+        return None
+
+    best_params = {}
+    with open(params_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or ':' not in line:
+                continue
+            k, v = line.split(':', 1)
+            k = k.strip()
+            v = v.strip()
+
+            # Normalize value
+            v_lower = v.lower()
+            if v_lower == "none":
+                parsed_v = None
+            elif v_lower == "true":
+                parsed_v = True
+            elif v_lower == "false":
+                parsed_v = False
+            else:
+                # Try int
+                try:
+                    parsed_v = int(v)
+                except ValueError:
+                    # Try float
+                    try:
+                        parsed_v = float(v)
+                    except ValueError:
+                        # Leave as string
+                        parsed_v = v
+            best_params[k] = parsed_v
+
+    return best_params
