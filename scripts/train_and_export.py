@@ -159,9 +159,23 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         df.to_parquet(cache_path)
         print(f"Cached {dataset.capitalize()} dataset at {cache_path}.")
 
+    
+    # If mushroom dataset, rename 'bruises%3f' to 'bruises' and fix values
+    if dataset == "mushroom":
+        df = preprocess_mushroom_dataset(df)
+
     # Split features and target
     X = df.drop('class', axis=1)
     y = df['class']
+
+    # Drop rows with missing values
+    if X.isnull().any().any():
+        missing_rows = df[df.isnull().any(axis=1)]
+        num_missing = missing_rows.shape[0]
+        print(f"Missing values detected. {num_missing} unique rows will be dropped due to missing values.")
+        df = df.dropna()
+        X = df.drop('class', axis=1)
+        y = df['class']
 
     # Describe dataset
     print(f"Dataset: {dataset.capitalize()}")
@@ -173,13 +187,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     print(X.describe(include='all'))
     print("Target class distribution:")
     print(y.value_counts())
-
-    # Drop rows with missing values
-    if X.isnull().any().any():
-        print("Missing values detected. Dropping rows with missing values.")
-        df = df.dropna()
-        X = df.drop('class', axis=1)
-        y = df['class']
 
     # Check output class distribution
     print("Class distribution:")
@@ -193,7 +200,8 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     else:
         print("No numerical features found.")
 
-    generate_overlapping_histograms(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type), dataset)
+    generate_overlapping_histograms(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset), dataset)
+    generate_categorical_barcharts(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset), dataset)
 
     # Get whichever class is minority
     minority_class = y.value_counts().idxmin()
@@ -226,52 +234,12 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
 
     # Custom binning for Adult dataset
     if dataset == "adult":
-        # Age bins
-        age_bins = [0, 25, 35, 45, 55, 65, 150]
-        age_labels = ["<25", "25-35", "35-45", "45-55", "55-65", "65+"]
-        X["age"] = pd.cut(X["age"].astype(float), bins=age_bins, labels=age_labels, right=False)
-
-        # Hours-per-week bins
-        hpw_bins = [0, 21, 41, 61, 1000]
-        hpw_labels = ["≤20", "21-40", "41-60", ">60"]
-        X["hours-per-week"] = pd.cut(X["hours-per-week"].astype(float), bins=hpw_bins, labels=hpw_labels, right=False)
-
-        # Capital-gain bins
-        cg = X["capital-gain"].astype(float)
-        cg_q25 = cg[cg > 0].quantile(0.25)
-        cg_q75 = cg[cg > 0].quantile(0.75)
-        def cg_bin(val):
-            if val == 0:
-                return "0"
-            elif val < cg_q25:
-                return "small"
-            elif val < cg_q75:
-                return "medium"
-            else:
-                return "high"
-        X["capital-gain"] = cg.apply(cg_bin)
-
-        # Capital-loss bins
-        cl = X["capital-loss"].astype(float)
-        cl_q25 = cl[cl > 0].quantile(0.25)
-        cl_q75 = cl[cl > 0].quantile(0.75)
-        def cl_bin(val):
-            if val == 0:
-                return "0"
-            elif val < cl_q25:
-                return "small"
-            elif val < cl_q75:
-                return "medium"
-            else:
-                return "high"
-        X["capital-loss"] = cl.apply(cl_bin)
-
-        # Optionally bin fnlwgt or drop if not useful
-        # Here, we bin into quartiles on log scale
-        X["fnlwgt"] = np.log1p(X["fnlwgt"].astype(float))
-        fnlwgt_bins = X["fnlwgt"].quantile([0, 0.25, 0.5, 0.75, 1.0]).values
-        fnlwgt_labels = ["Q1", "Q2", "Q3", "Q4"]
-        X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins, labels=fnlwgt_labels, include_lowest=True)
+        print("Applying custom binning to Adult dataset...")
+        X = bin_adult_dataset(X)
+        print("Binning applied. New feature types:")
+        print(X.dtypes)
+        print("Summary statistics after binning:")
+        print(X.describe(include='all'))
 
     # If feature_importances.csv exists, load and keep only top 90%
     outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
@@ -309,8 +277,8 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     # Encode y. For mushrooms p=0, e=1; for adult <=50K=0, >50K=1
     # We do it manually for each model
     if dataset == "mushroom":
-        y_train = y_train.map({'p': 0, 'e': 1}).astype(int)
-        y_test = y_test.map({'p': 0, 'e': 1}).astype(int)
+        y_train = y_train.map({'poisonous': 0, 'edible': 1}).astype(int)
+        y_test = y_test.map({'poisonous': 0, 'edible': 1}).astype(int)
     elif dataset == "adult":
         y_train = y_train.map({'<=50K': 0, '>50K': 1}).astype(int)
         y_test = y_test.map({'<=50K': 0, '>50K': 1}).astype(int)
@@ -499,6 +467,48 @@ def generate_overlapping_histograms(X, y, outdir, dataset_name):
         plt.close()
         print(f"Saved overlapping histogram for {col} to {plot_path}")
 
+def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50):
+    # Identify categorical columns
+    cat_cols = X.select_dtypes(include=['object', 'category']).columns
+    if len(cat_cols) == 0:
+        print("No categorical columns to plot.")
+        return
+
+    for col in cat_cols:
+        plt.figure(figsize=(10, 6))
+        plot_df = pd.concat([X[col], y], axis=1)
+        plot_df.columns = [col, 'target']
+        
+        # Count values to decide on log scale
+        counts = plot_df.groupby([col, 'target'], observed=True).size()
+        if len(counts) > 0:
+            max_count = counts.max()
+            min_count = counts.min() if counts.min() > 0 else 1  # avoid divide by zero
+            use_log = (max_count / min_count) > log_threshold
+        else:
+            use_log = False
+        
+        # Plot
+        ax = sns.countplot(data=plot_df, x=col, hue='target', dodge=True)
+        plt.title(f'Bar Chart of {col} by Class ({dataset_name.capitalize()})')
+        plt.xlabel(col)
+        plt.ylabel('Count (log scale)' if use_log else 'Count')
+        plt.legend(title='Class')
+        plt.xticks(rotation=45, ha='right')
+        
+        # Apply log scale if needed
+        if use_log:
+            ax.set_yscale('log')
+
+        # Save plot
+        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_barchart.png')
+        os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        plt.close()
+        print(f"Saved bar chart for {col} to {plot_path} (log scale: {use_log})")
+
+
 def load_best_params(params_path):
     """
     Load best hyperparameters from a text file.
@@ -550,3 +560,96 @@ def load_best_params(params_path):
             best_params[k] = parsed_v
 
     return best_params
+
+import pandas as pd
+import numpy as np
+
+def bin_adult_dataset(X):
+    # Age bins
+    age_bins = [0, 25, 35, 45, 55, 65, 150]
+    age_labels = ["<25", "25-35", "35-45", "45-55", "55-65", "65+"]
+    X["age"] = pd.cut(X["age"].astype(float), bins=age_bins, labels=age_labels, right=False)
+
+    # Hours-per-week bins
+    hpw_bins = [0, 21, 41, 61, 1000]
+    hpw_labels = ["≤20", "21-40", "41-60", ">60"]
+    X["hours-per-week"] = pd.cut(X["hours-per-week"].astype(float), bins=hpw_bins, labels=hpw_labels, right=False)
+
+    # Capital-gain bins using quartiles (non-zero values only)
+    cg = X["capital-gain"].astype(float)
+    cg_q25 = cg[cg > 0].quantile(0.25)
+    cg_q75 = cg[cg > 0].quantile(0.75)
+    def cg_bin(val):
+        if val == 0:
+            return "0"
+        elif val < cg_q25:
+            return "small"
+        elif val < cg_q75:
+            return "medium"
+        else:
+            return "high"
+    X["capital-gain"] = cg.apply(cg_bin)
+
+    # Capital-loss bins using quartiles (non-zero values only)
+    cl = X["capital-loss"].astype(float)
+    cl_q25 = cl[cl > 0].quantile(0.25)
+    cl_q75 = cl[cl > 0].quantile(0.75)
+    def cl_bin(val):
+        if val == 0:
+            return "0"
+        elif val < cl_q25:
+            return "small"
+        elif val < cl_q75:
+            return "medium"
+        else:
+            return "high"
+    X["capital-loss"] = cl.apply(cl_bin)
+
+    # Fnlwgt bins using quartiles on log-transformed values
+    X["fnlwgt"] = np.log1p(X["fnlwgt"].astype(float))
+    fnlwgt_bins = X["fnlwgt"].quantile([0, 0.25, 0.5, 0.75, 1.0]).values
+    fnlwgt_labels = ["Q1", "Q2", "Q3", "Q4"]
+    X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins, labels=fnlwgt_labels, include_lowest=True)
+
+    return X
+
+import pandas as pd
+
+def preprocess_mushroom_dataset(df):
+    # Rename column if needed
+    if 'bruises%3F' in df.columns:
+        df = df.rename(columns={'bruises%3F': 'bruises'})
+
+    # Mapping for categorical variables
+    value_maps = {
+        'class': {'e': 'edible', 'p': 'poisonous'},
+        'cap-shape': {'b': 'bell', 'c': 'conical', 'x': 'convex', 'f': 'flat', 'k': 'knobbed', 's': 'sunken'},
+        'cap-surface': {'f': 'fibrous', 'g': 'grooves', 'y': 'scaly', 's': 'smooth'},
+        'cap-color': {'n': 'brown', 'b': 'buff', 'c': 'cinnamon', 'g': 'gray', 'r': 'green', 'p': 'pink', 'u': 'purple', 'e': 'red', 'w': 'white', 'y': 'yellow'},
+        'bruises': {'t': 'yes', 'f': 'no'},
+        'odor': {'a': 'almond', 'l': 'anise', 'c': 'creosote', 'y': 'fishy', 'f': 'foul', 'm': 'musty', 'n': 'none', 'p': 'pungent', 's': 'spicy'},
+        'gill-attachment': {'a': 'attached', 'd': 'descending', 'f': 'free', 'n': 'notched'},
+        'gill-spacing': {'c': 'close', 'w': 'crowded', 'd': 'distant'},
+        'gill-size': {'b': 'broad', 'n': 'narrow'},
+        'gill-color': {'k': 'black', 'n': 'brown', 'b': 'buff', 'h': 'chocolate', 'g': 'gray', 'r': 'green', 'o': 'orange', 'p': 'pink', 'u': 'purple', 'e': 'red', 'w': 'white', 'y': 'yellow'},
+        'stalk-shape': {'e': 'enlarging', 't': 'tapering'},
+        'stalk-root': {'b': 'bulbous', 'c': 'club', 'u': 'cup', 'e': 'equal', 'z': 'rhizomorphs', 'r': 'rooted', '?': 'missing'},
+        'stalk-surface-above-ring': {'f': 'fibrous', 'y': 'scaly', 'k': 'silky', 's': 'smooth'},
+        'stalk-surface-below-ring': {'f': 'fibrous', 'y': 'scaly', 'k': 'silky', 's': 'smooth'},
+        'stalk-color-above-ring': {'n': 'brown', 'b': 'buff', 'c': 'cinnamon', 'g': 'gray', 'o': 'orange', 'p': 'pink', 'e': 'red', 'w': 'white', 'y': 'yellow'},
+        'stalk-color-below-ring': {'n': 'brown', 'b': 'buff', 'c': 'cinnamon', 'g': 'gray', 'o': 'orange', 'p': 'pink', 'e': 'red', 'w': 'white', 'y': 'yellow'},
+        'veil-type': {'p': 'partial', 'u': 'universal'},
+        'veil-color': {'n': 'brown', 'o': 'orange', 'w': 'white', 'y': 'yellow'},
+        'ring-number': {'n': 'none', 'o': 'one', 't': 'two'},
+        'ring-type': {'c': 'cobwebby', 'e': 'evanescent', 'f': 'flaring', 'l': 'large', 'n': 'none', 'p': 'pendant', 's': 'sheathing', 'z': 'zone'},
+        'spore-print-color': {'k': 'black', 'n': 'brown', 'b': 'buff', 'h': 'chocolate', 'r': 'green', 'o': 'orange', 'u': 'purple', 'w': 'white', 'y': 'yellow'},
+        'population': {'a': 'abundant', 'c': 'clustered', 'n': 'numerous', 's': 'scattered', 'v': 'several', 'y': 'solitary'},
+        'habitat': {'g': 'grasses', 'l': 'leaves', 'm': 'meadows', 'p': 'paths', 'u': 'urban', 'w': 'waste', 'd': 'woods'},
+    }
+
+    # Apply mappings
+    for col, mapping in value_maps.items():
+        if col in df.columns:
+            df[col] = df[col].map(mapping)
+
+    return df
