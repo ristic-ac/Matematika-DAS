@@ -152,9 +152,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         data = fetch_openml(name=dataset, version=version, as_frame=True)
         df = data.frame
         if dataset == "adult":
-            # Remove rows with missing values (marked as '?')
-            df = df.replace('?', pd.NA).dropna()
-            # The target column is 'class' in mushroom, but 'income' in adult
             df = df.rename(columns={'income': 'class'})
         df.to_parquet(cache_path)
         print(f"Cached {dataset.capitalize()} dataset at {cache_path}.")
@@ -170,6 +167,28 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
 
     # Drop rows with missing values
     if X.isnull().any().any():
+        unique_rows_before = df.shape[0]
+        print(f"Dataset has {unique_rows_before} rows before dropping missing values.")
+        print("Ratio of missing data per feature:")
+        print(X.isnull().mean())
+        # Plot the correlation between stalk-root and class for mushroom dataset
+        if dataset == "mushroom":
+            if pd.api.types.is_categorical_dtype(df['stalk-root']):
+                df['stalk-root'] = df['stalk-root'].cat.add_categories(['unknown'])
+            df['stalk-root'] = df['stalk-root'].fillna('unknown')
+            # Create contigency table
+            cont_table = pd.crosstab(df['stalk-root'], df['class'], dropna=False)
+            cont_table_norm = cont_table.div(cont_table.sum(axis=1), axis=0)
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cont_table_norm, annot=True, fmt=".2f", cmap='Blues')
+            plt.title('Normalized Contingency Table: stalk-root vs class')
+            plt.xlabel('class')
+            plt.ylabel('stalk-root')
+            heatmap_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, f'{dataset}_stalk_root_vs_class_heatmap.png')
+            os.makedirs(os.path.dirname(heatmap_path), exist_ok=True)
+            plt.savefig(heatmap_path)
+            plt.close()
+            print("Contingency table heatmap saved to:", heatmap_path)
         missing_rows = df[df.isnull().any(axis=1)]
         num_missing = missing_rows.shape[0]
         print(f"Missing values detected. {num_missing} unique rows will be dropped due to missing values.")
@@ -251,12 +270,16 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
             feat_imp = feat_imp.iloc[:, 0]
         feat_imp = feat_imp.sort_values(ascending=False)
         cum_importance = feat_imp.cumsum() / feat_imp.sum()
-        top_features = cum_importance[cum_importance <= 0.9].index.tolist()
+        top_features = cum_importance[cum_importance < 0.9].index.tolist()
+        if len(top_features) < len(feat_imp):
+            # Add the next feature to ensure >=90% coverage
+            next_feature = cum_importance.index[len(top_features)]
+            top_features.append(next_feature)
         print("Top features and their importances:")
         print(feat_imp.loc[top_features])
-        X = X[top_features]
-        print(f"Selected top {len(top_features)} features covering 90% importance.")
+        print(f"Selected top {len(top_features)} features covering at least 90% importance.")
         print("Total sum of importances for selected features:", feat_imp.loc[top_features].sum())
+        X = X[top_features]
         user_input = input("Top features selected. Press Enter to proceed with training on top features, or 'q' to exit: ")
         if user_input.strip().lower() == 'q':
             print("Exiting as requested.")
