@@ -81,21 +81,29 @@ def _normalize_head(head_str: str) -> str:
     return "pred_unknown(A)"  # fallback
 
 def _parse_feature_literal(lit: str) -> str:
-    # Expect feature(<var>, <feat>, <val>)
-    lit = lit.strip()
-    if not lit.startswith("feature("):
-        return lit
-    inside, _ = _extract_paren_content(lit, lit.find("("))
-    a0, a1, a2 = _split_top_level_commas(inside, 3)
-    a1, a2 = a1.strip(), a2.strip()
-    return f"feature(A, {a1}, {a2})"
+    """
+    Normalize any predicate literal so its first argument becomes A.
+      color(X, red)     -> color(A, red)
+      shape(Y, circle)  -> shape(A, circle)
+      p(Z)              -> p(A)
+    Leaves non-call atoms (e.g., 'true') unchanged.
+    """
+    s = _strip_enclosing_parens(lit.strip())
+    if "(" not in s or not s.endswith(")"):
+        return s  # not a predicate call, pass through
+
+    fun = s.split("(", 1)[0].strip().strip("'")
+    inside, _ = _extract_paren_content(s, s.find("("))
+    first, rest = _split_top_level_once(inside)
+
+    args = ["A"]
+    if rest is not None and rest.strip() != "":
+        args.append(rest.strip())
+
+    return f"{fun}({', '.join(args)})"
+
 
 def _flatten_body(body_str: str):
-    """
-    Return a flat list of literal strings from Aleph’s nested conjunctions.
-    Handles forms like:
-      ",(L1, L2)", "L1, ,(L2, L3)", "(L1, L2)", and single 'feature(...)'.
-    """
     s = _strip_enclosing_parens(body_str.strip())
 
     if s.startswith(",("):
@@ -104,7 +112,7 @@ def _flatten_body(body_str: str):
         return _flatten_body(left) + _flatten_body(right)
 
     left, right = _split_top_level_once(s)
-    if right is not None and not s.startswith("feature("):
+    if right is not None:
         return _flatten_body(left) + _flatten_body(right)
 
     s = _strip_enclosing_parens(s)
@@ -112,10 +120,11 @@ def _flatten_body(body_str: str):
         return []
     return [_parse_feature_literal(s)]
 
+
 def clean_aleph_clause(clause_str: str) -> str | None:
     """
     Transform Aleph clause term string into cleaned Prolog-style rule:
-      pred(A) :- feature(A, feat, val), feature(A, feat, val).
+      pred(A) :- feat(A, val), other_feat(A, val).
     Returns None if it's just a fact (e.g., pred(A).).
     """
     s = _strip_quotes_and_period(clause_str)

@@ -2,73 +2,13 @@ import os
 import sys
 from pyswip import Prolog
 from rule_check import compute_confusion_for_folder, plot_confusion_matrix_distillate, print_confusion_matrix_distillate
-from train_and_export import train_and_export_aleph_single
+from train_and_export import build_aleph_modes, train_and_export_aleph_single
 from rules import clean_aleph_program
 
-def build_aleph_modes(num_samples):
-    """
-    Build ALEPH_MODES dynamically, scaling noise as noise_base * factor.
-    """
-
-    return [
-        {
-            
-            "folder": "fast_bounded",
-            "settings": (
-                ":- aleph_set(search, ibs).\n"
-                ":- aleph_set(openlist, 15).\n"
-                ":- aleph_set(nodes, 1500).\n"
-                ":- aleph_set(evalfn, laplace).\n"
-                ":- aleph_set(minacc, 0.55).\n"
-                f":- aleph_set(noise, {int(num_samples * 0.02)}).\n"
-            )
-        },
-        {
-            "folder": "fast_precise",
-            "settings": (
-                ":- aleph_set(search, heuristic).\n"
-                ":- aleph_set(evalfn, accuracy).\n"
-                ":- aleph_set(nodes, 3000).\n"
-                ":- aleph_set(clauselength, 4).\n"
-                ":- aleph_set(minacc, 0.7).\n"
-                ":- aleph_set(minpos, 3).\n"
-                f":- aleph_set(noise, {int(num_samples * 0.02)}).\n"
-            )
-        },
-        {
-            "folder": "iterative_beam_search",
-            "settings": (
-                ":- aleph_set(search, ibs).\n"
-                ":- aleph_set(openlist, 10).\n"
-                ":- aleph_set(evalfn, compression).\n"
-                ":- aleph_set(nodes, 4000).\n"
-                ":- aleph_set(clauselength, 4).\n"
-                ":- aleph_set(minpos, 5).\n"
-                f":- aleph_set(noise, {int(num_samples * 0.05)}).\n"
-            )
-        }
-        ,
-        {
-            "folder": "breadth_first_laplace",
-            "settings": (
-            ":- aleph_set(search, bf).\n"
-            ":- aleph_set(evalfn, laplace).\n"
-            ":- aleph_set(nodes, 5000).\n"
-            ":- aleph_set(clauselength, 3).\n"
-            ":- aleph_set(minacc, 0.80).\n"
-            ":- aleph_set(minpos, 3).\n"
-            f":- aleph_set(noise, {int(num_samples * 0.05)}).\n"
-            )
-        }
-    ]
-
-
-def run_aleph_with_files(model_type, dataset, aleph_settings):
+def run_aleph_with_files(model_type, dataset, aleph_folder):
     """
     Run Aleph by consulting only {dataset}.pl in the corresponding model_type folder, as in swi.sh.
     """
-
-    aleph_folder, _ = list(aleph_settings)
 
     # Build paths relative to this script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -127,40 +67,23 @@ if __name__ == "__main__":
         print("Invalid dataset argument. Use one of: mushroom, adult")
         sys.exit(1)
 
-    testing_size = None
-    if dataset == "mushroom":
-        testing_size = 6657
-    elif dataset == "adult":
-        testing_size = 0
 
     for model in models:
-        aleph_modes = build_aleph_modes(testing_size)
-
+        aleph_modes = build_aleph_modes()
         if action == "train":
-            if mode_index is not None:
-                mode = aleph_modes[mode_index]
-                train_and_export_aleph_single(model, dataset, (mode["folder"], mode["settings"]))
-            else:
-                for mode in aleph_modes:
-                    train_and_export_aleph_single(model, dataset, (mode["folder"], mode["settings"]))
+            for mode_index, mode in aleph_modes.items():
+                train_and_export_aleph_single(model, dataset, mode_index)
 
         elif action == "aleph":
-            if mode_index is not None:
-                mode = aleph_modes[mode_index]
-                run_aleph_with_files(model, dataset, (mode["folder"], mode["settings"]))
-            else:
-                for mode in aleph_modes:
-                    run_aleph_with_files(model, dataset, (mode["folder"], mode["settings"]))
+            for mode_index, mode in aleph_modes.items():
+                run_aleph_with_files(model, dataset, mode_index)
 
         elif action == "both":
-            if mode_index is not None:
-                mode = aleph_modes[mode_index]
-                train_and_export_aleph_single(model, dataset, (mode["folder"], mode["settings"]))
-                run_aleph_with_files(model, dataset, (mode["folder"], mode["settings"]))
-            else:
-                for mode in aleph_modes:
-                    train_and_export_aleph_single(model, dataset, (mode["folder"], mode["settings"]))
-                    run_aleph_with_files(model, dataset, (mode["folder"], mode["settings"]))
+            for mode_index, mode in aleph_modes.items():
+                print(f"=== Model: {model}, Dataset: {dataset}, Mode: {mode_index} ===")
+                train_and_export_aleph_single(model, dataset, mode_index)
+                run_aleph_with_files(model, dataset, mode_index)
+
         else:
             print("Invalid action. Use one of: train, aleph, both")
             sys.exit(1)

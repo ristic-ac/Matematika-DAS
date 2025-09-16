@@ -1,16 +1,22 @@
 import os
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-Feature = Tuple[str, str, str]
+# A feature condition is now (predicate, value)
+Feature = Tuple[str, str]
 Rule = Tuple[str, List[Feature]]
 
 def parse_rules(rule_file: str) -> List[Rule]:
+    """
+    Parse rules of the form:
+      target(A) :- color(A, red), shape(A, circle).
+    """
     rules: List[Rule] = []
     head_pat = re.compile(r"^(\w+)\s*\(\s*\w+\s*\)\s*:-\s*(.*)\.$")
-    cond_pat = re.compile(r"(\w+)\s*\(\s*\w+\s*,\s*([^,]+)\s*,\s*([^\)]+)\s*\)")
+    # body literals are strictly binary: pred(Var, Val)
+    cond_pat = re.compile(r"(\w+)\s*\(\s*\w+\s*,\s*([^\)]+)\s*\)")
     with open(rule_file) as f:
         for line in f:
             line = line.strip()
@@ -21,14 +27,19 @@ def parse_rules(rule_file: str) -> List[Rule]:
                 continue
             target = m_head.group(1)
             body = m_head.group(2)
-            conds = [(p.strip(), a.strip(), v.strip()) 
-                     for (p, a, v) in cond_pat.findall(body)]
+            conds = [(p.strip(), v.strip()) for (p, v) in cond_pat.findall(body)]
             rules.append((target, conds))
     return rules
 
-def load_features(b_file: str) -> Dict[str, Dict[Tuple[str,str], str]]:
-    feats: Dict[str, Dict[Tuple[str,str], str]] = {}
-    pat = re.compile(r"(\w+)\s*\(\s*(\w+)\s*,\s*([^,]+)\s*,\s*([^\)]+)\s*\)\s*\.")
+def load_features(b_file: str) -> Dict[str, Dict[str, Set[str]]]:
+    """
+    Load background facts of the form:
+      color(x1, red).
+      shape(x1, circle).
+    Returns: { ex_id: { pred: {val1, val2, ...} } }
+    """
+    feats: Dict[str, Dict[str, Set[str]]] = {}
+    pat = re.compile(r"(\w+)\s*\(\s*(\w+)\s*,\s*([^\)]+)\s*\)\s*\.")
     with open(b_file) as f:
         for line in f:
             line = line.strip()
@@ -37,11 +48,17 @@ def load_features(b_file: str) -> Dict[str, Dict[Tuple[str,str], str]]:
             m = pat.match(line)
             if not m:
                 continue
-            pred, ex, attr, val = m.groups()
-            feats.setdefault(ex, {})[(pred.strip(), attr.strip())] = val.strip()
+            pred, ex, val = m.groups()
+            pred, ex, val = pred.strip(), ex.strip(), val.strip()
+            feats.setdefault(ex, {}).setdefault(pred, set()).add(val)
     return feats
 
 def load_examples(f_file: str) -> List[Tuple[str, str]]:
+    """
+    Examples remain unary:
+      target(x1).
+      target(x2).
+    """
     exs: List[Tuple[str, str]] = []
     pat = re.compile(r"(\w+)\s*\(\s*(\w+)\s*\)\s*\.")
     with open(f_file) as f:
@@ -54,14 +71,19 @@ def load_examples(f_file: str) -> List[Tuple[str, str]]:
                 exs.append((m.group(1).strip(), m.group(2).strip()))
     return exs
 
-def predicts(rules: List[Rule], ex_id: str, features: Dict[str, Dict[Tuple[str,str], str]], target_pred: str) -> bool:
+def predicts(rules: List[Rule], ex_id: str,
+             features: Dict[str, Dict[str, Set[str]]],
+             target_pred: str) -> bool:
+    """
+    A rule fires iff ALL its conds (pred, val) are present in features for ex_id.
+    """
     if ex_id not in features:
         return False
-    fdict = features[ex_id]
+    fdict = features[ex_id]  # {pred: {values}}
     for (head, conds) in rules:
         if head != target_pred:
             continue
-        if all((pred, attr) in fdict and fdict[(pred, attr)] == val for pred, attr, val in conds):
+        if all(pred in fdict and val in fdict[pred] for pred, val in conds):
             return True
     return False
 
@@ -121,7 +143,6 @@ def print_confusion_matrix_distillate(metrics: Dict[str, int], outdir: str):
     print()
     print(f"        {total_pos:<5}        {total_neg:<5}        {total_all:<5}")
 
-    # Save confusion matrix values if outdir is provided
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         cm_values_path = os.path.join(outdir, "confusion_matrix_values.txt")
@@ -129,8 +150,6 @@ def print_confusion_matrix_distillate(metrics: Dict[str, int], outdir: str):
             f.write("TP\tFP\tFN\tTN\n")
             f.write(f"{TP}\t{FP}\t{FN}\t{TN}\n")
         print("Confusion matrix values saved to:", cm_values_path)
-
-
 
 def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str, dataset: str):
     """
@@ -140,7 +159,6 @@ def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str
     """
     TP, FP, FN, TN = metrics["TP"], metrics["FP"], metrics["FN"], metrics["TN"]
 
-    # Dataset-specific labels
     if dataset.lower() == "mushroom":
         pos_label, neg_label = "edible", "poisonous"
     elif dataset.lower() == "adult":
@@ -148,10 +166,9 @@ def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str
     else:
         pos_label, neg_label = "Positive", "Negative"
 
-    # Correct layout: rows = Actual (P,N), cols = Predicted (P,N)
     cm = [
-        [TP, FN],  # Actual Positive -> (Pred Pos = TP, Pred Neg = FN)
-        [FP, TN],  # Actual Negative -> (Pred Pos = FP, Pred Neg = TN)
+        [TP, FN],  # Actual Positive -> (Pred Pos, Pred Neg)
+        [FP, TN],  # Actual Negative -> (Pred Pos, Pred Neg)
     ]
 
     labels = [pos_label, neg_label]
@@ -170,4 +187,3 @@ def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str
     plt.savefig(cm_path, bbox_inches="tight")
     plt.close()
     print("Confusion matrix saved to:", cm_path)
-

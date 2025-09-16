@@ -48,6 +48,64 @@ models = {
     ),
 }
 
+def build_aleph_modes():
+    """
+    Build ALEPH_MODES dynamically, keeping noise ratios predefined in the modes.
+    """
+
+    return {
+        "fast_bounded": {
+            "noise_ratio": 0.02,
+            "settings_template": (
+                ":- aleph_set(search, ibs).\n"
+                ":- aleph_set(openlist, 15).\n"
+                ":- aleph_set(nodes, 1500).\n"
+                ":- aleph_set(evalfn, laplace).\n"
+                ":- aleph_set(minacc, 0.65).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+        },
+        "fast_simple": {
+            "noise_ratio": 0.05,
+            "settings_template": (
+                ":- aleph_set(search, bf).\n"
+                ":- aleph_set(evalfn, coverage).\n"
+                ":- aleph_set(nodes, 5000).\n"
+                ":- aleph_set(clauselength, 3).\n"
+                ":- aleph_set(minpos, 2).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+        },
+        "balanced_medium": {
+            "noise_ratio": 0.1,
+            "settings_template": (
+                ":- aleph_set(search, heuristic).\n"
+                ":- aleph_set(evalfn, laplace).\n"
+                ":- aleph_set(nodes, 10000).\n"
+                ":- aleph_set(clauselength, 5).\n"
+                ":- aleph_set(minpos, 3).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+        },
+    }
+
+
+def build_aleph_noise_settings(num_samples, folder_name):
+    """
+    Generate ALEPH_MODES by filling in noise values based on num_samples and folder_name.
+    """
+
+    modes = build_aleph_modes()
+    mode = modes.get(folder_name)
+    if mode is None:
+        raise ValueError(f"Invalid folder name: {folder_name}. Valid folders are: {list(modes.keys())}")
+
+    noise_value = int(num_samples * mode["noise_ratio"])
+    mode["settings"] = mode["settings_template"].format(noise_value=noise_value)
+    del mode["settings_template"]  # Remove the template after use
+
+    return mode
+
 def _to_atom(s: str) -> str:
     """
     Converts a given string to a valid atom name by replacing non-alphanumeric characters with underscores,
@@ -136,8 +194,7 @@ def plot_feature_correlation_heatmap(X, dataset):
     plt.close()
     print("Feature correlation heatmap saved to:", heatmap_path)
 
-def train_and_export_aleph_single(model_type, dataset, aleph_settings):
-    aleph_folder, aleph_hyperparams = list(aleph_settings)
+def train_and_export_aleph_single(model_type, dataset, aleph_folder):
     cache_dir = os.path.join(os.path.dirname(__file__), '..', 'cache')
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, f"{dataset}.parquet")
@@ -381,7 +438,7 @@ def train_and_export_aleph_single(model_type, dataset, aleph_settings):
         for col, val in row.items():
             ftr = _to_atom(col)
             v = _to_atom(val)
-            bg.append(f"feature({mid}, {ftr}, {v}).")
+            bg.append(f"{ftr}({mid}, {v}).")
     bg.append(":- end_bg.\n")
 
     # Positives/negatives from TRAINING labels
@@ -398,9 +455,10 @@ def train_and_export_aleph_single(model_type, dataset, aleph_settings):
 
     # Write Aleph training program with full BG + training pos/neg
     pl_path = os.path.join(outdir, f"{dataset}.pl")
+    aleph_hyperparams = build_aleph_noise_settings(len(y_train), aleph_folder)["settings"]
     with open(pl_path, "w") as f:
         aleph_preamble = generate_aleph_header_lines()
-        aleph_modes = generate_aleph_modes(pred_label)
+        aleph_modes = generate_aleph_modes(pred_label, X.columns)
         f.write("\n".join([aleph_preamble] + [aleph_hyperparams] + [aleph_modes] + bg + pos + neg))
     print("Aleph training program written to:", pl_path)
 
@@ -425,7 +483,7 @@ def train_and_export_aleph_single(model_type, dataset, aleph_settings):
             for col, val in row.items():
                 ftr = _to_atom(col)
                 v = _to_atom(val)
-                f.write(f"feature({mid}, {ftr}, {v}).\n")
+                f.write(f"{ftr}({mid}, {v}).\n")
     print("Test background knowledge written to:", test_b_path)
 
 
@@ -616,6 +674,22 @@ def bin_adult_dataset(X):
     fnlwgt_labels = ["Q1", "Q2", "Q3", "Q4"]
     X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins, labels=fnlwgt_labels, include_lowest=True)
 
+    if "education" in X.columns:
+        X["education"] = X["education"].map(
+            lambda ed: (
+                'Below_HS' if ed in ['Preschool', '1st-4th', '5th-6th', '7th-8th', '9th', '10th', '11th'] else
+                'HS_Graduate' if ed in ['12th', 'HS-Grad'] else
+                'Some_College_Associate' if ed in ['Some-college', 'Assoc-acdm', 'Assoc-voc'] else
+                'Bachelors' if ed == 'Bachelors' else
+                'Advanced_Degree' if ed in ['Masters', 'Prof-school', 'Doctorate'] else
+                'Other'
+            )
+        )
+    
+    # Drop education-num as it's redundant now
+    if "education-num" in X.columns:
+        X = X.drop(columns=["education-num"])
+
     return X
 
 import pandas as pd
@@ -667,12 +741,19 @@ def generate_aleph_header_lines():
         ":- aleph."                        # Initialize Aleph
     ])
 
-def generate_aleph_modes(pred_label):
+def generate_aleph_modes(pred_label, features):
     """
-    Returns the other three lines (mode declarations and determination) of the Aleph preface header.
+    Returns the mode declarations and determination lines for Aleph, using individual features.
+
+    Args:
+        pred_label (str): The target predicate label.
+        features (list): List of feature names.
+
+    Returns:
+        str: Aleph mode declarations and determinations.
     """
-    return "\n".join([
-        f":- modeh(*, {pred_label}(+id)).",  # Head mode: target predicate
-        ":- modeb(*, feature(+id, #feature, #value)).", # Body mode: features
-        f":- determination({pred_label}/1, feature/3)."  # Allow features in rules for pred_label
-    ])
+    modes = [f":- modeh(*, {pred_label}(+id))."]  # Head mode: target predicate
+    for feature in features:
+        modes.append(f":- modeb(1, {_to_atom(feature)}(+id, #value)).")  # Body mode: individual feature
+        modes.append(f":- determination({pred_label}/1, {_to_atom(feature)}/2).")  # Allow feature in rules for pred_label
+    return "\n".join(modes)
