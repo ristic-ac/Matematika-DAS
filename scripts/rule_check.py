@@ -100,7 +100,7 @@ def compute_confusion_for_folder(folder: str, dataset: str) -> Dict[str, float]:
 
     return {"TP": TP, "FP": FP, "FN": FN, "TN": TN, "Accuracy": acc}
 
-def print_confusion_matrix_distillate(metrics: Dict[str, int]):
+def print_confusion_matrix_distillate(metrics: Dict[str, int], outdir: str):
     TP = metrics["TP"]
     FP = metrics["FP"]
     FN = metrics["FN"]
@@ -120,6 +120,15 @@ def print_confusion_matrix_distillate(metrics: Dict[str, int]):
     print(f"     -  {FN:<5}        {TN:<5}        {total_pred_neg:<5}")
     print()
     print(f"        {total_pos:<5}        {total_neg:<5}        {total_all:<5}")
+
+    # Save confusion matrix values if outdir is provided
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
+        cm_values_path = os.path.join(outdir, "confusion_matrix_values.txt")
+        with open(cm_values_path, "w") as f:
+            f.write("TP\tFP\tFN\tTN\n")
+            f.write(f"{TP}\t{FP}\t{FN}\t{TN}\n")
+        print("Confusion matrix values saved to:", cm_values_path)
 
 
 

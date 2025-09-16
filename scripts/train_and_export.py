@@ -136,7 +136,8 @@ def plot_feature_correlation_heatmap(X, dataset):
     plt.close()
     print("Feature correlation heatmap saved to:", heatmap_path)
 
-def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
+def train_and_export_aleph_single(model_type, dataset, aleph_settings):
+    aleph_folder, aleph_hyperparams = list(aleph_settings)
     cache_dir = os.path.join(os.path.dirname(__file__), '..', 'cache')
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, f"{dataset}.parquet")
@@ -184,7 +185,7 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
             plt.title('Normalized Contingency Table: stalk-root vs class')
             plt.xlabel('class')
             plt.ylabel('stalk-root')
-            heatmap_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, f'{dataset}_stalk_root_vs_class_heatmap.png')
+            heatmap_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, 'charts' , 'categorical', f'{dataset}_stalk_root_vs_class_heatmap.png')
             os.makedirs(os.path.dirname(heatmap_path), exist_ok=True)
             plt.savefig(heatmap_path)
             plt.close()
@@ -219,8 +220,12 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     else:
         print("No numerical features found.")
 
-    generate_overlapping_histograms(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset), dataset)
-    generate_categorical_barcharts(X, y, os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset), dataset)
+    charts_outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, 'charts')
+    numerical_outdir = os.path.join(charts_outdir, 'numerical')
+    categorical_outdir = os.path.join(charts_outdir, 'categorical')
+
+    generate_overlapping_histograms(X, y, numerical_outdir, dataset)
+    generate_categorical_barcharts(X, y, categorical_outdir, dataset)
 
     # Get whichever class is minority
     minority_class = y.value_counts().idxmin()
@@ -236,16 +241,8 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         y = df['class']
         print("New class distribution:")
         print(y.value_counts())
-        user_input = input("Classes balanced. Press Enter to proceed with training, or 'q' to exit: ")
-        if user_input.strip().lower() == 'q':
-            print("Exiting as requested.")
-            sys.exit(0)
     else:
         print("Classes are already balanced.")
-        user_input = input("Press Enter to proceed with training, or 'q' to exit: ")
-        if user_input.strip().lower() == 'q':
-            print("Exiting as requested.")
-            sys.exit(0)
     
     # Print class distribution after balancing
     print("Final class distribution:")
@@ -280,10 +277,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         print(f"Selected top {len(top_features)} features covering at least 90% importance.")
         print("Total sum of importances for selected features:", feat_imp.loc[top_features].sum())
         X = X[top_features]
-        user_input = input("Top features selected. Press Enter to proceed with training on top features, or 'q' to exit: ")
-        if user_input.strip().lower() == 'q':
-            print("Exiting as requested.")
-            sys.exit(0)
 
     # Keep original X for ILP; encode only for sklearn
     enc = OrdinalEncoder()
@@ -339,11 +332,25 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         print("Best params:", grid.best_params_)
         print(f"Test Accuracy: {accuracy_score(y_test, y_pred):.4f}")
         print(classification_report(y_test, y_pred))
+        # Save best hyperparameters to a file
+        params_path = os.path.join(outdir, 'best_params.txt')
+        with open(params_path, 'w') as f:
+            for k, v in grid.best_params_.items():
+                f.write(f"{k}: {v}\n")
+        print("Best hyperparameters written to:", params_path)
+        # Print message to re-run for final model
+        print("Re-run the script to train final model with best hyperparameters.")
+        exit(0)
 
     # Output paths
     outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
     os.makedirs(outdir, exist_ok=True)
-    pl_path = os.path.join(outdir, f"{dataset}.pl")
+
+    # Save which columns were used for training
+    cols_path = os.path.join(outdir, 'feature_columns.txt')
+    with open(cols_path, 'w') as f:
+        f.write("\n".join(X_train.columns))
+    print("Feature columns written to:", cols_path)
 
     save_and_print_confusion_matrix_model(
         clf, y_test, y_pred, outdir, model_type, dataset
@@ -355,44 +362,16 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
         print("Feature importances computed and saved. Exiting to allow re-run with top features only.")
         sys.exit(0)
 
+    # Append aleph folder to outdir for Aleph files
+    outdir = os.path.join(outdir, aleph_folder)
+    os.makedirs(outdir, exist_ok=True)
+    print("Aleph output directory:", outdir)
+    
     # Stable IDs for all examples (train + test)
     all_ids = [f"m{i+1}" for i in range(len(X))]
     id_map = pd.Series(all_ids, index=X.index)
 
     pred_label = 'edible' if dataset == "mushroom" else 'gt_50K'
-
-    # Build sections
-    # Aleph header for the generated Prolog file.
-    # The following lines configure Aleph's behavior and search parameters.
-    clauses = 1
-    clause_length = 5
-    nodes = 1000
-    # Set noise as 5% of the dataset size (rounded to nearest integer)
-    NOISE_PERCENTAGE = 0.05
-    noise = int(round(NOISE_PERCENTAGE * len(df)))
-    minpos = 10  # Minimum number of positive examples a clause must cover
-    minscore = 0.0  # Set a lower bound on the utility of an acceptable clause (default -inf) BEWARE: you can get counter-intuitive results in conjunction with the minpos setting.
-    verbose = 0 # 0=silent, 1=normal, 2=verbose
-    evalfn = "laplace" # coverage, compression, posonly, pbayes, accuracy, laplace, auto_m, mestimate, entropy, gini, sd, wracc, or user (default coverage).
-    search_strategy = "bf"  # Options: bf, df, heuristic, ibs, ils, rls, scs, id, ic, ar, or false, default bf
-    header = [
-        ":- use_module(library(aleph)).",  # Load Aleph library
-        ":- aleph.",                       # Initialize Aleph
-        f":- aleph_set(verbose, {verbose}).",      # (Optional) Set verbosity: 0=silent, 1=normal, 2=verbose
-        f":- aleph_set(clause_length, {clause_length}).", # Set max clause length
-        # f":- aleph_set(clauses, {clauses}).",      # Set max number of clauses in hypothesis
-        # "%:- aleph_set(i, 4).",            # https://www.swi-prolog.org/pack/file_details/aleph/doc/manual.html#manual, Controls how many new variables Aleph is allowed to introduce in a clause body
-        f":- aleph_set(nodes, {nodes}).",  # Set max number of nodes explored
-        f":- aleph_set(noise, {noise}).",  # Allow up to {noise} negative examples per clause
-        # f":- aleph_set(evalfn, {evalfn}).",  # Set evaluation function
-        # f":- aleph_set(search, {search_strategy}).",  # Set search strategy
-        # f":- aleph_set(minpos, {minpos}).",  # Minimum positive examples a clause must cover
-        "% The following modes and determination declare the learning bias",
-        f":- modeh(*, {pred_label}(+id)).",  # Head mode: target predicate
-        ":- modeb(*, feature(+id, #feature, #value)).", # Body mode: features
-        f":- determination({pred_label}/1, feature/3).",  # Allow features in rules for pred_label
-        ""
-    ]
 
     # Build complete background knowledge (training + testing)
     bg = [":- begin_bg."]
@@ -418,8 +397,11 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
     neg.append(":- end_in_neg.\n")
 
     # Write Aleph training program with full BG + training pos/neg
+    pl_path = os.path.join(outdir, f"{dataset}.pl")
     with open(pl_path, "w") as f:
-        f.write("\n".join(header + bg + pos + neg))
+        aleph_preamble = generate_aleph_header_lines()
+        aleph_modes = generate_aleph_modes(pred_label)
+        f.write("\n".join([aleph_preamble] + [aleph_hyperparams] + [aleph_modes] + bg + pos + neg))
     print("Aleph training program written to:", pl_path)
 
     # Write positive test examples into test.f
@@ -446,13 +428,6 @@ def train_and_export_aleph_single(model_type="dt", dataset="mushroom"):
                 f.write(f"feature({mid}, {ftr}, {v}).\n")
     print("Test background knowledge written to:", test_b_path)
 
-    # Save best hyperparameters to a file
-    params_path = os.path.join(outdir, 'best_params.txt')
-    with open(params_path, 'w') as f:
-        for k, v in grid.best_params_.items():
-            f.write(f"{k}: {v}\n")
-    print("Best hyperparameters written to:", params_path)
-
 
 # Function that creates histograms for numerical features in the outdir
 # Name should include dataset name for clarity (e.g., adult_age_histogram.png)
@@ -467,24 +442,27 @@ def generate_overlapping_histograms(X, y, outdir, dataset_name):
 
     # Create overlapping histograms for each numerical column
     for col in num_cols:
+        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_overlap_histogram.png')
+        if os.path.exists(plot_path):
+            print(f"Overlapping histogram for {col} already exists at {plot_path}, skipping.")
+            continue
         plt.figure(figsize=(8, 6))
         # Compute common bins for all classes
         data_all = X[col].dropna()
         bins = np.histogram_bin_edges(data_all, bins=30)
         for class_value in sorted(y.unique()):
             sns.histplot(
-            X[y == class_value][col],
-            bins=bins,
-            kde=False,
-            stat="density",
-            label=str(class_value),
-            alpha=0.5
+                X[y == class_value][col],
+                bins=bins,
+                kde=False,
+                stat="density",
+                label=str(class_value),
+                alpha=0.5
             )
         plt.title(f'Overlapping Histogram of {col} ({dataset_name.capitalize()})')
         plt.xlabel(col)
         plt.ylabel('Density')
         plt.legend(title='Class')
-        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_overlap_histogram.png')
         os.makedirs(os.path.dirname(plot_path), exist_ok=True)
         plt.savefig(plot_path)
         plt.close()
@@ -498,6 +476,11 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
         return
 
     for col in cat_cols:
+        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_barchart.png')
+        if os.path.exists(plot_path):
+            print(f"Bar chart for {col} already exists at {plot_path}, skipping.")
+            continue
+
         plt.figure(figsize=(10, 6))
         plot_df = pd.concat([X[col], y], axis=1)
         plot_df.columns = [col, 'target']
@@ -524,7 +507,6 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
             ax.set_yscale('log')
 
         # Save plot
-        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_barchart.png')
         os.makedirs(os.path.dirname(plot_path), exist_ok=True)
         plt.tight_layout()
         plt.savefig(plot_path)
@@ -676,3 +658,21 @@ def preprocess_mushroom_dataset(df):
             df[col] = df[col].map(mapping)
 
     return df
+def generate_aleph_header_lines():
+    """
+    Returns the first two lines of the Aleph preface header.
+    """
+    return "\n".join([
+        ":- use_module(library(aleph)).",  # Load Aleph library
+        ":- aleph."                        # Initialize Aleph
+    ])
+
+def generate_aleph_modes(pred_label):
+    """
+    Returns the other three lines (mode declarations and determination) of the Aleph preface header.
+    """
+    return "\n".join([
+        f":- modeh(*, {pred_label}(+id)).",  # Head mode: target predicate
+        ":- modeb(*, feature(+id, #feature, #value)).", # Body mode: features
+        f":- determination({pred_label}/1, feature/3)."  # Allow features in rules for pred_label
+    ])
