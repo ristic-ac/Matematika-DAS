@@ -1,7 +1,7 @@
 import os
 import sys
 from pyswip import Prolog
-from rule_check import compute_confusion_for_folder, plot_confusion_matrix_distillate, print_confusion_matrix_distillate
+from rule_check import compute_fidelity_confusion_for_folder, evaluate_folder, plot_confusion_matrix_distillate, print_confusion_matrix_distillate
 from train_and_export import build_aleph_modes, train_and_export_aleph_single
 from rules import clean_aleph_program
 
@@ -35,9 +35,7 @@ def run_aleph_with_files(model_type, dataset, aleph_folder):
         cleaned = clean_aleph_program(program, out_path=os.path.join(base_dir, f"{dataset}_hypothesis.pl"))
         for c in cleaned:
             print(c)
-        metrics = compute_confusion_for_folder(base_dir, dataset)
-        print_confusion_matrix_distillate(metrics, base_dir)
-        plot_confusion_matrix_distillate(metrics, outdir=base_dir, model_type=model, dataset=dataset)
+        evaluate_folder(base_dir, dataset, model_type=model_type)
     else:
         print("No hypothesis term.")
 
@@ -53,7 +51,7 @@ if __name__ == "__main__":
         model_arg = sys.argv[1].lower()
         action = sys.argv[2].lower()
         dataset = sys.argv[3].lower()
-        mode_index = int(sys.argv[4]) if len(sys.argv) > 4 else None  # <--- NEW ARG
+        mode_index = sys.argv[4] if len(sys.argv) > 4 else None
 
     if model_arg == "all":
         models = ["dt", "rf", "xgb"]
@@ -69,17 +67,25 @@ if __name__ == "__main__":
 
 
     for model in models:
-        aleph_modes = build_aleph_modes()
+        aleph_modes = build_aleph_modes(dataset)
+        if mode_index is not None:
+            if mode_index not in aleph_modes:
+                print(f"Invalid mode index: {mode_index}. Available modes: {list(aleph_modes.keys())}")
+                sys.exit(1)
+            modes_to_process = {mode_index: aleph_modes[mode_index]}
+        else:
+            modes_to_process = aleph_modes
+
         if action == "train":
-            for mode_index, mode in aleph_modes.items():
+            for mode_index, mode in modes_to_process.items():
                 train_and_export_aleph_single(model, dataset, mode_index)
 
         elif action == "aleph":
-            for mode_index, mode in aleph_modes.items():
+            for mode_index, mode in modes_to_process.items():
                 run_aleph_with_files(model, dataset, mode_index)
 
         elif action == "both":
-            for mode_index, mode in aleph_modes.items():
+            for mode_index, mode in modes_to_process.items():
                 print(f"=== Model: {model}, Dataset: {dataset}, Mode: {mode_index} ===")
                 train_and_export_aleph_single(model, dataset, mode_index)
                 run_aleph_with_files(model, dataset, mode_index)

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import json
 
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -48,78 +49,163 @@ models = {
     ),
 }
 
-def build_aleph_modes():
+def build_aleph_modes(dataset):
     """
-    Build ALEPH_MODES dynamically, keeping noise ratios predefined in the modes.
+    Build ALEPH_MODES dynamically, keeping noise ratios and minpos ratios predefined in the modes.
+    Separate modes for 'mushroom' and 'adult' datasets.
     """
 
-    return {
-        "fast_bounded": {
-            "noise_ratio": 0.02,
-            "settings_template": (
-                ":- aleph_set(search, ibs).\n"
-                ":- aleph_set(openlist, 15).\n"
-                ":- aleph_set(nodes, 1500).\n"
-                ":- aleph_set(evalfn, laplace).\n"
-                ":- aleph_set(minacc, 0.65).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-        },
-        "fast_simple": {
-            "noise_ratio": 0.05,
-            "settings_template": (
-                ":- aleph_set(search, bf).\n"
-                ":- aleph_set(evalfn, coverage).\n"
-                ":- aleph_set(nodes, 5000).\n"
-                ":- aleph_set(clauselength, 3).\n"
-                ":- aleph_set(minpos, 2).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-        },
-        "balanced_medium": {
-            "noise_ratio": 0.1,
+    if dataset not in ["mushroom", "adult"]:
+        raise ValueError(f"Invalid dataset: {dataset}. Choose 'mushroom' or 'adult'.")
+    
+    if dataset == "mushroom":
+        return {
+            "sniper": {
+            "noise_ratio": 0.005,
+            "minpos_ratio": 0.01,
             "settings_template": (
                 ":- aleph_set(search, heuristic).\n"
+                ":- aleph_set(openlist, 40).\n"
+                ":- aleph_set(nodes, 80000).\n"
                 ":- aleph_set(evalfn, laplace).\n"
-                ":- aleph_set(nodes, 10000).\n"
-                ":- aleph_set(clauselength, 5).\n"
-                ":- aleph_set(minpos, 3).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.90).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
                 ":- aleph_set(noise, {noise_value}).\n"
             )
-        },
-    }
+            },
+            "sweet_spot": {
+            "noise_ratio": 0.02,
+            "minpos_ratio": 0.01,
+            "settings_template": (
+                ":- aleph_set(search, heuristic).\n"
+                ":- aleph_set(openlist, 64).\n"
+                ":- aleph_set(nodes, 100000).\n"
+                ":- aleph_set(evalfn, wracc).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.80).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+            },
+            "sweeper": {
+            "noise_ratio": 0.1,
+            "minpos_ratio": 0.01,
+            "settings_template": (
+                ":- aleph_set(search, bf).\n"
+                ":- aleph_set(openlist, 1000).\n"
+                ":- aleph_set(nodes, 150000).\n"
+                ":- aleph_set(evalfn, coverage).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.70).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+            },
+        }
+    elif dataset == "adult":
+        return {
+            "sniper": {
+            "noise_ratio": 0.005,
+            "minpos_ratio": 0.01,
+            "settings_template": (
+                ":- aleph_set(search, heuristic).\n"
+                ":- aleph_set(openlist, 60).\n"
+                ":- aleph_set(nodes, 100000).\n"
+                ":- aleph_set(evalfn, laplace).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.85).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+            },
+            "sweet_spot": {
+            "noise_ratio": 0.02,
+            "minpos_ratio": 0.01,
+            "settings_template": (
+                ":- aleph_set(search, heuristic).\n"
+                ":- aleph_set(openlist, 80).\n"
+                ":- aleph_set(nodes, 120000).\n"
+                ":- aleph_set(evalfn, wracc).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.75).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+            },
+            "sweeper": {
+            "noise_ratio": 0.1,
+            "minpos_ratio": 0.01,
+            "settings_template": (
+                ":- aleph_set(search, bf).\n"
+                ":- aleph_set(openlist, 1500).\n"
+                ":- aleph_set(nodes, 200000).\n"
+                ":- aleph_set(evalfn, coverage).\n"
+                ":- aleph_set(clauselength, {clauselength_value}).\n"
+                ":- aleph_set(minacc, 0.65).\n"
+                ":- aleph_set(minpos, {minpos_value}).\n"
+                ":- aleph_set(noise, {noise_value}).\n"
+            )
+            },
+        }
 
 
-def build_aleph_noise_settings(num_samples, folder_name):
+def build_aleph_noise_settings(num_samples, aleph_preset, dataset, model_type):
     """
-    Generate ALEPH_MODES by filling in noise values based on num_samples and folder_name.
+    Generate ALEPH_MODES by filling in noise, minpos, and clauselength values based on num_samples and folder_name.
     """
 
-    modes = build_aleph_modes()
-    mode = modes.get(folder_name)
+    modes = build_aleph_modes(dataset)
+    mode = modes.get(aleph_preset)
     if mode is None:
-        raise ValueError(f"Invalid folder name: {folder_name}. Valid folders are: {list(modes.keys())}")
+        raise ValueError(f"Invalid folder name: {aleph_preset}. Valid folders are: {list(modes.keys())}")
 
-    noise_value = int(num_samples * mode["noise_ratio"])
-    mode["settings"] = mode["settings_template"].format(noise_value=noise_value)
+    # Calculate clauselength based on the number of rows in feature_columns.txt
+    model_dir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
+    feature_columns_path = os.path.join(model_dir, 'feature_columns.txt')
+    clauselength_value = 4  # Default value
+    if os.path.exists(feature_columns_path):
+        with open(feature_columns_path, 'r') as f:
+            num_features = sum(1 for _ in f)
+        if aleph_preset == "sniper":
+            clauselength_value = max(2, min(10, num_features))  # N for sniper
+        elif aleph_preset == "sweeper":
+            clauselength_value = 2  # Fixed value for sweeper
+        elif aleph_preset == "sweet_spot":
+            clauselength_value = max(2, min(10, (num_features + 2) // 2))  # Something in between
+    else:
+        print(f"Warning: feature_columns.txt not found at {feature_columns_path}. Using default clauselength of 4.")
+        exit(1)
+
+    num_positive_samples = int(num_samples / 2)  # Assuming balanced classes after preprocessing
+    num_negative_samples = int(num_samples / 2)  # Assuming balanced classes after preprocessing
+    noise_value = int(num_negative_samples * mode["noise_ratio"])    # We use half the training set size because of class balancing
+    minpos_value = max(1, int(num_positive_samples * mode["minpos_ratio"]))
+    mode["settings"] = mode["settings_template"].format(
+    noise_value=noise_value,
+    minpos_value=minpos_value,
+    clauselength_value=clauselength_value
+    )
     del mode["settings_template"]  # Remove the template after use
 
     return mode
 
 def _to_atom(s: str) -> str:
     """
-    Converts a given string to a valid atom name by replacing non-alphanumeric characters with underscores,
-    ensuring it starts with a letter or underscore, and converting it to lowercase.
+    Converts a given string to a valid atom name by removing non-alphanumeric characters,
+    ensuring it starts with 'v_' and converting it to lowercase.
 
     Args:
         s (str): The input string to be converted.
 
     Returns:
-        str: A valid atom name in lowercase, with non-alphanumeric characters replaced and a leading 'v_' if necessary.
+        str: A valid atom name in lowercase, with non-alphanumeric characters removed and a leading 'v_'.
     """
     s = str(s)
     s = re.sub(r'[^A-Za-z0-9_]', '_', s)
-    if not re.match(r'^[A-Za-z_]', s):
+    if s.startswith('_'):
+        s = s[1:]
+    if not s.startswith('v_'):
         s = 'v_' + s
     return s.lower()
 
@@ -144,7 +230,7 @@ def save_and_print_confusion_matrix_model(clf, y_test, y_pred, outdir, model_typ
 
     if dataset == "mushroom":
         labels = [0, 1]
-        custom_labels = ["poisonous", "edible"]
+        custom_labels = ["edible", "poisonous"]
     elif dataset == "adult":
         labels = [0, 1]
         custom_labels = ["lte_50K", "gt_50K"]
@@ -194,7 +280,7 @@ def plot_feature_correlation_heatmap(X, dataset):
     plt.close()
     print("Feature correlation heatmap saved to:", heatmap_path)
 
-def train_and_export_aleph_single(model_type, dataset, aleph_folder):
+def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     cache_dir = os.path.join(os.path.dirname(__file__), '..', 'cache')
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, f"{dataset}.parquet")
@@ -347,11 +433,17 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
     # Print number of samples in train and test sets
     print(f"Training samples: {len(X_train)}, Testing samples: {len(X_test)}")
 
+    # Print the number of pos. and neg. samples in train and test sets
+    print("Training set class distribution:")
+    print(y_train.value_counts())
+    print("Testing set class distribution:")
+    print(y_test.value_counts())
+
     # Encode y. For mushrooms p=0, e=1; for adult <=50K=0, >50K=1
     # We do it manually for each model
     if dataset == "mushroom":
-        y_train = y_train.map({'poisonous': 0, 'edible': 1}).astype(int)
-        y_test = y_test.map({'poisonous': 0, 'edible': 1}).astype(int)
+        y_train = y_train.map({'edible': 0, 'poisonous': 1}).astype(int)
+        y_test = y_test.map({'edible': 0, 'poisonous': 1}).astype(int)
     elif dataset == "adult":
         y_train = y_train.map({'<=50K': 0, '>50K': 1}).astype(int)
         y_test = y_test.map({'<=50K': 0, '>50K': 1}).astype(int)
@@ -372,6 +464,7 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
         clf = base_model.set_params(**best_params)
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
+        y_pred = pd.Series(y_pred, index=y_test.index)
         grid = type('DummyGrid', (), {'best_params_': best_params})()  # Dummy for later use
     else:
         # Grid search
@@ -385,10 +478,10 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
         grid.fit(X_train, y_train)
         clf = grid.best_estimator_
         y_pred = clf.predict(X_test)
+        y_pred = pd.Series(y_pred, index=y_test.index)
         print(f"Model: {model_type.upper()}")
         print("Best params:", grid.best_params_)
         print(f"Test Accuracy: {accuracy_score(y_test, y_pred):.4f}")
-        print(classification_report(y_test, y_pred))
         # Save best hyperparameters to a file
         params_path = os.path.join(outdir, 'best_params.txt')
         with open(params_path, 'w') as f:
@@ -409,6 +502,22 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
         f.write("\n".join(X_train.columns))
     print("Feature columns written to:", cols_path)
 
+    report = classification_report(y_test, y_pred, output_dict=True)
+    print(report)
+    # Replace 0/1 with actual labels in the classification report
+    if dataset == "mushroom":
+        label_map = {0: "edible", 1: "poisonous"}
+    elif dataset == "adult":
+        label_map = {0: "lte_50K", 1: "gt_50K"}
+    else:
+        label_map = {i: str(c) for i, c in enumerate(clf.classes_)}
+
+    report = {label_map[int(k)] if k.isdigit() else k: v for k, v in report.items()}
+    report_path = os.path.join(outdir, 'classification_report.json')
+    with open(report_path, 'w') as f:
+        json.dump(report, f, indent=4)
+    print("Classification report saved to:", report_path)
+
     save_and_print_confusion_matrix_model(
         clf, y_test, y_pred, outdir, model_type, dataset
     )
@@ -420,7 +529,7 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
         sys.exit(0)
 
     # Append aleph folder to outdir for Aleph files
-    outdir = os.path.join(outdir, aleph_folder)
+    outdir = os.path.join(outdir, aleph_preset)
     os.makedirs(outdir, exist_ok=True)
     print("Aleph output directory:", outdir)
     
@@ -455,7 +564,7 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
 
     # Write Aleph training program with full BG + training pos/neg
     pl_path = os.path.join(outdir, f"{dataset}.pl")
-    aleph_hyperparams = build_aleph_noise_settings(len(y_train), aleph_folder)["settings"]
+    aleph_hyperparams = build_aleph_noise_settings(len(y_train), aleph_preset, dataset, model_type)["settings"]
     with open(pl_path, "w") as f:
         aleph_preamble = generate_aleph_header_lines()
         aleph_modes = generate_aleph_modes(pred_label, X.columns)
@@ -465,19 +574,19 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
     # Write positive test examples into test.f
     test_f_path = os.path.join(outdir, f'{dataset}_test.f')
     with open(test_f_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 1]))
+        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 1]))
     print("Positive test examples written to:", test_f_path)
 
     # Write negative test examples into test.n
     test_n_path = os.path.join(outdir, f'{dataset}_test.n')
     with open(test_n_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
+        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 0]))
     print("Negative test examples written to:", test_n_path)
 
     # Write test background knowledge into test.b
     test_b_path = os.path.join(outdir, f'{dataset}_test.b')
     with open(test_b_path, "w") as f:
-        for orig_idx in y_test.index:
+        for orig_idx in y_pred.index:
             mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
             row = X.loc[orig_idx]
             for col, val in row.items():
@@ -486,6 +595,17 @@ def train_and_export_aleph_single(model_type, dataset, aleph_folder):
                 f.write(f"{ftr}({mid}, {v}).\n")
     print("Test background knowledge written to:", test_b_path)
 
+    # Write the real y_test labels to separate .f and .n files for later evaluation
+    y_true_f_path = os.path.join(outdir, f'{dataset}_y_true.f')
+    y_true_n_path = os.path.join(outdir, f'{dataset}_y_true.n')
+
+    with open(y_true_f_path, "w") as f:
+        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 1]))
+    print("Positive y_test labels written to:", y_true_f_path)
+
+    with open(y_true_n_path, "w") as f:
+        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
+    print("Negative y_test labels written to:", y_true_n_path)
 
 # Function that creates histograms for numerical features in the outdir
 # Name should include dataset name for clarity (e.g., adult_age_histogram.png)
@@ -624,9 +744,6 @@ def load_best_params(params_path):
 
     return best_params
 
-import pandas as pd
-import numpy as np
-
 def bin_adult_dataset(X):
     # Age bins
     age_bins = [0, 25, 35, 45, 55, 65, 150]
@@ -691,8 +808,6 @@ def bin_adult_dataset(X):
         X = X.drop(columns=["education-num"])
 
     return X
-
-import pandas as pd
 
 def preprocess_mushroom_dataset(df):
     # Rename column if needed
