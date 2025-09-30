@@ -10,15 +10,7 @@ header-includes:
   - \newcommand{\FTNLogo}{./images/ftn-logo.png}
   - \titlegraphic{\includegraphics[height=1.8cm]{\FTNLogo}}
   - |
-    \setbeamertemplate{logo}{%
-      \ifnum\thepage>1%
-        \vbox to 0pt{%
-          \vskip 1ex
-          \hbox to \paperwidth{\hfill\includegraphics[height=0.9cm]{\FTNLogo}\hspace{0.5cm}}%
-          \vss
-        }%
-      \fi%
-    }
+    \setbeamertemplate{logo}{\ifnum\thepage>1\raisebox{6.4cm}[0pt][0pt]{\makebox[\paperwidth][r]{\includegraphics[height=0.9cm]{\FTNLogo}\hspace{0cm}}}\fi}
   - \usepackage{etoolbox}
   - \beamerdefaultoverlayspecification{<+->}
   - \newcounter{itemizeDepth}
