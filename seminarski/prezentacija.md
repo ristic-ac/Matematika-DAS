@@ -6,6 +6,19 @@ shortauthor: "Ристић"
 institute: 'Факултет техничких наука, Универзитет у Новом Саду'
 date: '2025-10-01'
 header-includes:
+  - \usepackage{graphicx}
+  - \newcommand{\FTNLogo}{./images/ftn-logo.png}
+  - \titlegraphic{\includegraphics[height=1.8cm]{\FTNLogo}}
+  - |
+    \setbeamertemplate{logo}{%
+      \ifnum\thepage>1%
+        \vbox to 0pt{%
+          \vskip 1ex
+          \hbox to \paperwidth{\hfill\includegraphics[height=0.9cm]{\FTNLogo}\hspace{0.5cm}}%
+          \vss
+        }%
+      \fi%
+    }
   - \usepackage{etoolbox}
   - \beamerdefaultoverlayspecification{<+->}
   - \newcounter{itemizeDepth}
