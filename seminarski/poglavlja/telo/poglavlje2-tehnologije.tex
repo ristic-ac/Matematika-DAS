@@ -1,0 +1,160 @@
+\section{\emph{Prolog} и \emph{Aleph ILP} у пракси}
+
+У овом поглављу биће описани основни појмови и кораци потребни за рад са \emph{Prolog} језиком и \emph{Aleph ILP} системом, као и неки практични савети за рад.
+
+\subsection{\emph{Prolog}: језик, извршавање и доказивање}
+\emph{Prolog} је логички језик заснован на \emph{Хорновим клаузама}. Програм чине \emph{чињенице} и \emph{правила}, а корисник поставља \emph{упите}. Правило
+\[
+B \ \leftarrow\ A_1,\dots,A_n
+\]
+у \emph{Prolog}-у се пише као \verb|B :- A1, ..., An.|; чињеница као \verb|B.|; упит као \verb|?- A1, ..., An.|. \cite{swi_prolog_docs}
+
+\subsection{\emph{SLD} инференцијско правило}
+
+Као што је већ описано у претходном поглављу, \textbf{\emph{SLD}} резолуција (\emph{Selective Linear Definite clause resolution}) представља основно инференцијско правило у логичком програмирању и нарочито у језику Пролог. 
+
+\subsubsection{Пример}
+База знања је дата у изворном коду \ref{code:prologbk}.
+
+\begin{listing}[H]
+\begin{minted}[linenos, frame=lines]{prolog}
+parent(john, mary).
+parent(mary, susan).
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+\end{minted}
+\caption{Пример базе знања у \emph{Prolog}-у}
+\label{code:prologbk}
+\end{listing}
+
+Упит је дат у изворном коду \ref{code:prologquery}.
+\begin{listing}[H]
+\begin{minted}[linenos, frame=lines]{prolog}
+?- ancestor(john, susan).
+\end{minted}
+\caption{Пример упита у \emph{Prolog}-у}
+\label{code:prologquery}
+\end{listing}
+
+\noindent Кораци \emph{SLD}-резолуције:
+\begin{enumerate}
+  \item Изабран потциљ: $ancestor(john, susan)$.
+  \item Покушај са правилом (3): даје нови циљ $parent(john, susan)$ (нема чињенице $\Rightarrow$ неуспех).
+  \item Покушај са правилом (4): нови циљ $parent(john, Z), ancestor(Z, susan)$.
+  \item Први потциљ $parent(john, Z)$ унификује се са чињеницом $parent(john, mary)$,\\
+  па је $Z = mary$. Нови циљ: $ancestor(mary, susan)$.
+  \item Покушај са правилом (3): $ancestor(mary, susan) \Rightarrow parent(mary, susan)$, што постоји у бази знања.
+  \item Добијамо празан циљ $\Box$ $\Rightarrow$ успех.
+\end{enumerate} \cite{sld_resolution}
+
+Дакле, упит $ancestor(john, susan)$ је тачан и доказан \emph{SLD} резолуцијом.
+
+\subsection{Како у табеларним скуповима кодирати податке}
+За класичне, табеларне скупове згодно је користити идентификатор примера и \emph{атрибут=вредност} релације, као што је приказано у изворном коду \ref{code:prologdata}.
+
+\begin{listing}[H]
+\begin{minted}[linenos, frame=lines]{prolog}
+gt_50K(id123).                 % позитиван пример (циљ)
+v_education(id123, bachelors). % атрибут
+v_hours_per_week(id123, '40+').
+...
+\end{minted}
+\caption{Пример кодирања табеларних података у Prolog-у}
+\label{code:prologdata}
+\end{listing}
+
+
+Циљни предикат је \verb|gt_50K/1|, а сви \verb|v_*| предикати чине позадинско знање (BK).
+
+\subsection{\emph{Aleph ILP}: појам, датотеке и алгоритам}
+\emph{Aleph} добија позитивне/негативне примере (\(E^+,E^-\)), позадинско знање (BK) и \emph{језички bias} (mode/determination), па гради теорију (скуп правила) која покрива \(E^+\) и избегава \(E^-\). \cite{aleph_manual}.
+
+\subsubsection{Базни алгоритам (скраћено)}
+Кораци \emph{Aleph} алгоритма:
+\begin{enumerate}
+  \item Изабери позитиван пример.
+  \item \emph{Сатурација}: конструиши \emph{најспецифичнију} (\emph{bottom}) клаузу која објашњава пример унутар дозвољеног језика.
+  \item \emph{Редукција}: претражи генерализације (подскупове тела) и оцењуј клаузе.
+  \item Додај најбољу клаузу у теорију и уклони покривене примере.
+  \item Понављај док сви позитивни примери не буду покривени или док се не достигну ограничења.
+\end{enumerate} \cite{aleph_manual}
+
+\paragraph{Формат уноса.}
+Класични \emph{Aleph} користи три фајла: \verb|.b| (BK+подешавања), \verb|.f| (\(E^+\)), \verb|.n| (\(E^-\)). \emph{SWI} \emph{pack aleph} омогућава и \emph{једнофajлски} формат са секцијама \verb|begin_bg/end_bg|, \verb|begin_in_pos/end_in_pos|, \verb|begin_in_neg/end_in_neg|. \cite{aleph_manual}.
+
+\paragraph{Синтакса и типске ознаке.}  
+\emph{Aleph} користи декларације \verb|modeh(Recall, HeadSpec).| и \verb|modeb(Recall, BodySpec).| како би ограничио простор могућих правила. Овде:
+
+\begin{itemize}
+  \item \verb|Recall| одређује колика је \emph{недетерминистичност}, тј.\ колико пута достигнуће тело (\emph{body}) или глава (\emph{head}) могу бити успешно инстанцирани за дати облик. Симбол \verb|*| значи „ограничено, али без конкретног броја“.  
+  \item Типске ознаке су:
+  \begin{itemize}
+    \item \verb|+T| — улазна променљива типа \texttt{T} (input),  
+    \item \verb|-T| — излазна променљива типа \texttt{T} (output),  
+    \item \verb|#T| — константа типа \texttt{T}.
+  \end{itemize}
+  \item \verb|modeh| одређује како изгледа глава правила — предикат који се предвиђа, са својим аргументима.  
+  \item \verb|modeb| дефинише које предикате и са каквим аргументима може да има тело правила (што се користи у доказу / позадинском знању).
+\end{itemize}
+
+\paragraph{Determination.}  
+Декларација  
+\begin{quote}
+\verb|determination(Target/Arity, Background/Arity).|
+\end{quote}
+наводи који предикати из позадинског знања \emph{Aleph} сме да користи у телу правила за циљни предикат \verb|Target/Arity|.
+
+\begin{itemize}
+  \item Уколико нема \verb|determination| декларација за неки циљ, \emph{Aleph} неће конструисати клаузе за тај циљ, јер нема дозволених предиката у телу.  
+  \item \verb|determination| помаже да се смањи број могућих правила које \emph{Aleph} разматра, што чини учење ефикаснијим и прецизнијим.
+\end{itemize}
+
+\subsection{Подешавања претраге и оцењивања}
+\emph{Aleph} има бројне параметре који утичу на процес учења. Неки од најважнијих су:
+\begin{itemize}
+  \item \verb|aleph_set(search, #search)|: стратегија претраге. Подразумевана је \verb|bf|.
+  \item \verb|aleph_set(evalfn, #evalfn)|: функција оцене, односно коју метрику користити за оцену клауза.
+  \item \verb|aleph_set(clauselength, #clauselength)|: дужина клауза (максималан број литерала у телу клауза).
+  \item \verb|aleph_set(minacc, #minacc)|: доња граница прецизности клаузе да би била прихваћена у теорију.
+  \item \verb|aleph_set(nodes, #nodes)|: горња граница броја \emph{чворова} (кандидат-клаузa) у једној претрази; више \(\Rightarrow\) шира претрага.
+  \item \verb|aleph_set(openlist, #openlist)|: ширина \emph{beam}-а у greedy претрази (кад се користи beam/heuristic варијанта). \cite{aleph_manual}
+\end{itemize}
+
+\subsection{Типичан ток рада у SWI \texttt{pack aleph}}
+Једнофajлски формат (згодан за експерименте) приказан је у изворном коду \ref{code:alephfile}.
+\begin{listing}[H]
+\begin{minted}[linenos, frame=lines]{prolog}
+:- use_module(library(aleph)).
+:- aleph.
+
+% ... modeh/modeb/determination и aleph_set/2 ...
+
+:- begin_bg.
+% ovde ide BK: v_* činjenice/pomoćni predikati
+:- end_bg.
+
+:- begin_in_pos.
+gt_50K(id123).
+% ...
+:- end_in_pos.
+
+:- begin_in_neg.
+gt_50K(id999).
+% ...
+:- end_in_neg.
+
+% ?- induce.
+\end{minted}
+\caption{Пример \emph{Aleph ILP} једнофajлског формата}
+\label{code:alephfile}
+\end{listing}
+
+\subsection{Практични савети}
+\begin{itemize}
+  \item Балансирање \texttt{coverage} и \texttt{minacc}: ако правила постану широка и обухватају \(E^-\), потребно је повећати \verb|minacc| или ограничити \verb|noise|, ако су правила претесна, смањити \verb|minacc|.
+  \item Рад са нумеричким атрибутима: Пролог користи категоричке атрибуте, па је неопходно дискретизовати нумеричка обележја. Овај приступ омогућава рад са нумеричким подацима и смањује простор претраге.
+  \item Побољшање ефикасности: вредност \verb|nodes| треба поставити реално (почети са мањом вредношћу и постепено повећавати). \verb|openlist| је користан код beam/heuristic претраге. \verb|clauselength| треба држати на мањој вредности како би се избегла експлозија претраге. \cite{aleph_manual}
+\end{itemize}
+
+
+

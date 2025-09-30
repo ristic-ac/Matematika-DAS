@@ -1,4 +1,21 @@
+% In your preamble:
+\usepackage{booktabs,tabularx,ltablex} % better tables
+\usepackage{siunitx}                   % numeric alignment (optional)
+\usepackage{hyperref}                  % links
+\usepackage{minted}                    % code
+\usepackage{fvextra}                   % minted line breaks
+\usepackage{caption}                   % caption tweaks if needed
+\keepXColumns                         % for ltablex
+
+% Helpful column types
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{R}{>{\raggedleft\arraybackslash}X}
+
+
 \usepackage{fancyhdr}
+\usepackage{latexsym}
+\usepackage{stmaryrd} % For \llbracket and \rrbracket
+\usepackage{float}
 
 \makeatletter
 \let\thetitle\@title
@@ -10,5 +27,5 @@
 \pagestyle{fancy}
 \fancyhf{}
 \rhead{\theauthor}
-\lhead{\thetitle}
+\lhead{\shorttitle}
 \cfoot{\thepage}

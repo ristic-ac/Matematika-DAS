@@ -1,10 +1,351 @@
 
 \begin{appendices}
 
-\section{Први додатак}
-Додаци су необавезни део рада. Овде се могу убацити сирови подаци на основу којих сте, на пример, нацртали графиконе приказане у телу рада, а којих је исувише да би се приказали у самом телу рада без одвлачења пажње читаоца са шире слике утицаја добијених резултата.
+\section{Табеле са резултатима}
 
-\section{Други додатак}
-ТОДО опционо
+\subsection{Перформансе дестилованих ИЛП модела}
+
+\subsubsection{Mushroom}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}llllccccc@{}}
+\toprule
+\textbf{ID} & \textbf{Скуп} & \textbf{Учитељ} & \textbf{Поставка} & \textbf{Тачност} & \textbf{MCC} & \textbf{Фиделитет} & \textbf{\#Правила} & \textbf{Прос. тело} \\
+\midrule
+1 & mushroom & dt  & sniper      & 95.74\% & 91.82\% & 94.98\% & 6 & 1.83 \\
+2 & mushroom & dt  & sweet\_spot & 95.74\% & 91.82\% & 94.98\% & 6 & 1.83 \\
+3 & mushroom & dt  & sweeper     & 95.74\% & 91.82\% & 94.98\% & 6 & 1.83 \\
+4 & mushroom & rf  & sniper      & 100.00\% & 100.00\% & 100.00\% & 7 & 2.14 \\
+5 & mushroom & rf  & sweet\_spot & 100.00\% & 100.00\% & 100.00\% & 7 & 2.14 \\
+6 & mushroom & rf  & sweeper     & 99.66\% & 99.32\% & 99.66\% & 8 & 1.75 \\
+7 & mushroom & xgb & sniper      & 100.00\% & 100.00\% & 99.23\% & 8 & 1.50 \\
+8 & mushroom & xgb & sweet\_spot & 100.00\% & 100.00\% & 99.23\% & 8 & 1.50 \\
+9 & mushroom & xgb & sweeper     & 100.00\% & 100.00\% & 99.23\% & 8 & 1.50 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Перформансе дестилованих ИЛП модела за скуп \textit{mushroom}. Метрике су приказане на тест скуповима (у процентима).}
+\label{tab:ilp-mushroom}
+\end{table}
+
+
+\subsubsection{Adult}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}llllccccc@{}}
+\toprule
+\textbf{ID} & \textbf{Скуп} & \textbf{Учитељ} & \textbf{Поставка} & \textbf{Тачност} & \textbf{MCC} & \textbf{Фиделитет} & \textbf{\#Правила} & \textbf{Прос. тело} \\
+\midrule
+1 & adult & dt  & sniper      & 74.46\% & 52.17\% & 77.07\% & 24 & 2.54 \\
+2 & adult & dt  & sweet\_spot & 73.95\% & 49.47\% & 77.34\% & 8  & 1.63 \\
+3 & adult & dt  & sweeper     & 69.49\% & 40.24\% & 68.84\% & 4  & 1.00 \\
+4 & adult & rf  & sniper      & 76.27\% & 55.01\% & 78.44\% & 40 & 2.83 \\
+5 & adult & rf  & sweet\_spot & 75.62\% & 53.42\% & 77.49\% & 9  & 1.78 \\
+6 & adult & rf  & sweeper     & 69.49\% & 40.24\% & 68.09\% & 4  & 1.00 \\
+7 & adult & xgb & sniper      & 75.50\% & 53.89\% & 78.65\% & 56 & 2.86 \\
+8 & adult & xgb & sweet\_spot & 76.06\% & 54.32\% & 78.74\% & 13 & 1.85 \\
+9 & adult & xgb & sweeper     & 70.53\% & 42.15\% & 71.36\% & 5  & 1.00 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Перформансе дестилованих ИЛП модела за скуп \textit{adult}. Метрике су на тест скуповима (у процентима).}
+\label{tab:ilp-adult}
+\end{table}
+
+
+
+\subsection{Списак најбољих три правила по комбинацији (датасет, учитељ, поставка)}
+
+\subsubsection{Mushroom}
+
+% ===================== FULL LIST (CLAUSES IN LISTING) =====================
+% --- TABLE 1 (MUSHROOM) ---
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lllrrrrr@{}}
+\toprule
+\textbf{Скуп} & \textbf{Учитељ} & \textbf{Поставка} & \textbf{ИД правила} & \textbf{|Тело|} & \textbf{Подршка} & \textbf{Покривеност} & \textbf{Прецизност} \\
+\midrule
+% --- MUSHROOM (DT) ---
+mushroom & dt  & sniper      & 4 & 3 & 270 & 0.4530 & 1.0000 \\
+mushroom & dt  & sniper      & 6 & 2 & 238 & 0.3993 & 1.0000 \\
+mushroom & dt  & sniper      & 3 & 1 & 10  & 0.0168 & 1.0000 \\
+mushroom & dt  & sweet\_spot & 4 & 3 & 270 & 0.4530 & 1.0000 \\
+mushroom & dt  & sweet\_spot & 6 & 2 & 238 & 0.3993 & 1.0000 \\
+mushroom & dt  & sweet\_spot & 3 & 1 & 10  & 0.0168 & 1.0000 \\
+mushroom & dt  & sweeper     & 4 & 3 & 270 & 0.4530 & 1.0000 \\
+mushroom & dt  & sweeper     & 6 & 2 & 238 & 0.3993 & 1.0000 \\
+mushroom & dt  & sweeper     & 3 & 1 & 10  & 0.0168 & 1.0000 \\
+% --- MUSHROOM (RF) ---
+mushroom & rf  & sniper      & 7 & 3 & 352 & 0.5997 & 1.0000 \\
+mushroom & rf  & sniper      & 4 & 1 & 332 & 0.5656 & 1.0000 \\
+mushroom & rf  & sniper      & 5 & 1 & 265 & 0.4514 & 1.0000 \\
+mushroom & rf  & sweet\_spot & 7 & 3 & 352 & 0.5997 & 1.0000 \\
+mushroom & rf  & sweet\_spot & 4 & 1 & 332 & 0.5656 & 1.0000 \\
+mushroom & rf  & sweet\_spot & 5 & 1 & 265 & 0.4514 & 1.0000 \\
+mushroom & rf  & sweeper     & 8 & 2 & 352 & 0.5997 & 1.0000 \\
+mushroom & rf  & sweeper     & 5 & 1 & 332 & 0.5656 & 1.0000 \\
+mushroom & rf  & sweeper     & 6 & 1 & 265 & 0.4514 & 1.0000 \\
+% --- MUSHROOM (XGB) ---
+mushroom & xgb & sniper      & 8 & 1 & 332 & 0.5589 & 1.0000 \\
+mushroom & xgb & sniper      & 6 & 3 & 270 & 0.4545 & 1.0000 \\
+mushroom & xgb & sniper      & 7 & 1 & 30  & 0.0505 & 1.0000 \\
+mushroom & xgb & sweet\_spot & 8 & 1 & 332 & 0.5589 & 1.0000 \\
+mushroom & xgb & sweet\_spot & 6 & 3 & 270 & 0.4545 & 1.0000 \\
+mushroom & xgb & sweet\_spot & 7 & 1 & 30  & 0.0505 & 1.0000 \\
+mushroom & xgb & sweeper     & 8 & 1 & 332 & 0.5589 & 1.0000 \\
+mushroom & xgb & sweeper     & 6 & 3 & 270 & 0.4545 & 1.0000 \\
+mushroom & xgb & sweeper     & 7 & 1 & 30  & 0.0505 & 1.0000 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Комплетан списак правила за скуп MUSHROOM. Клаузе нису у табели већ у листинзима~\ref{code:prologbk-mushroom-dt}--\ref{code:prologbk-mushroom-xgb}.}
+\label{tab:rules-mushroom}
+\end{table}
+
+
+\subsubsection{Adult}
+
+% --- TABLE 2 (ADULT) ---
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lllrrrrr@{}}
+\toprule
+\textbf{Скуп} & \textbf{Учитељ} & \textbf{Поставка} & \textbf{ИД правила} & \textbf{|Тело|} & \textbf{Подршка} & \textbf{Покривеност} & \textbf{Прецизност} \\
+\midrule
+% --- ADULT (DT) ---
+adult    & dt  & sniper      & 19 & 3 & 174 & 0.0943 & 1.0000 \\
+adult    & dt  & sniper      & 3  & 1 & 154 & 0.0835 & 1.0000 \\
+adult    & dt  & sniper      & 15 & 2 & 128 & 0.0694 & 1.0000 \\
+adult    & dt  & sweet\_spot & 5  & 2 & 433 & 0.2336 & 0.9954 \\
+adult    & dt  & sweet\_spot & 6  & 2 & 265 & 0.1230 & 0.8566 \\
+adult    & dt  & sweet\_spot & 3  & 1 & 196 & 0.1062 & 1.0000 \\
+adult    & dt  & sweeper     & 3  & 1 & 702 & 0.2802 & 0.7365 \\
+adult    & dt  & sweeper     & 4  & 1 & 408 & 0.1951 & 0.8824 \\
+adult    & dt  & sweeper     & 2  & 1 & 196 & 0.1062 & 1.0000 \\
+% --- ADULT (RF) ---
+adult    & rf  & sniper      & 38 & 2 & 294 & 0.1565 & 1.0000 \\
+adult    & rf  & sniper      & 33 & 3 & 229 & 0.1209 & 0.9913 \\
+adult    & rf  & sniper      & 36 & 3 & 220 & 0.1171 & 1.0000 \\
+adult    & rf  & sweet\_spot & 7  & 2 & 484 & 0.2561 & 0.9938 \\
+adult    & rf  & sweet\_spot & 8  & 2 & 294 & 0.1565 & 1.0000 \\
+adult    & rf  & sweet\_spot & 9  & 2 & 298 & 0.1427 & 0.8993 \\
+adult    & rf  & sweeper     & 3  & 1 & 702 & 0.2806 & 0.7507 \\
+adult    & rf  & sweeper     & 4  & 1 & 408 & 0.1901 & 0.8750 \\
+adult    & rf  & sweeper     & 2  & 1 & 196 & 0.1033 & 0.9898 \\
+% --- ADULT (XGB) ---
+adult    & xgb & sniper      & 54 & 2 & 294 & 0.1591 & 0.9830 \\
+adult    & xgb & sniper      & 49 & 3 & 229 & 0.1233 & 0.9782 \\
+adult    & xgb & sniper      & 52 & 3 & 220 & 0.1211 & 1.0000 \\
+adult    & xgb & sweet\_spot & 10 & 2 & 484 & 0.2614 & 0.9814 \\
+adult    & xgb & sweet\_spot & 11 & 2 & 294 & 0.1591 & 0.9830 \\
+adult    & xgb & sweet\_spot & 13 & 2 & 298 & 0.1502 & 0.9161 \\
+adult    & xgb & sweeper     & 3  & 1 & 702 & 0.2906 & 0.7521 \\
+adult    & xgb & sweeper     & 5  & 1 & 408 & 0.1987 & 0.8848 \\
+adult    & xgb & sweeper     & 2  & 1 & 196 & 0.1068 & 0.9898 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Комплетан списак правила за скуп ADULT. Клаузе нису у табели већ у листинзима~\ref{code:prologbk-adult-dt}--\ref{code:prologbk-adult-xgb}.}
+\label{tab:rules-adult}
+\end{table}
+
+\subsection{Правила у Prolog-у}
+
+
+
+% ===================== PROLOG LISTING WITH ALL CLAUSES =====================
+% ===================== PROLOG LISTING WITH ALL CLAUSES (HEAD EXCLUDED) =====================
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% Each clause is keyed by: rule(Dataset, Teacher, Preset, RuleId).
+% Bodies retain the original feature literals.
+
+% === MUSHROOM / DT === (order: sniper, sweet_spot, sweeper)
+rule(mushroom, dt, sniper, 4) :-
+    v_spore_print_color(A, v_white), v_ring_number(A, v_one),
+    v_gill_spacing(A, v_close).
+rule(mushroom, dt, sniper, 6) :-
+    v_spore_print_color(A, v_chocolate), v_gill_size(A, v_broad).
+rule(mushroom, dt, sniper, 3) :-
+    v_spore_print_color(A, v_green).
+rule(mushroom, dt, sweet_spot, 4) :-
+    v_spore_print_color(A, v_white), v_ring_number(A, v_one),
+    v_gill_spacing(A, v_close).
+rule(mushroom, dt, sweet_spot, 6) :-
+    v_spore_print_color(A, v_chocolate), v_gill_size(A, v_broad).
+rule(mushroom, dt, sweet_spot, 3) :-
+    v_spore_print_color(A, v_green).
+rule(mushroom, dt, sweeper, 4) :-
+    v_spore_print_color(A, v_white), v_ring_number(A, v_one),
+    v_gill_spacing(A, v_close).
+rule(mushroom, dt, sweeper, 6) :-
+    v_spore_print_color(A, v_chocolate), v_gill_size(A, v_broad).
+rule(mushroom, dt, sweeper, 3) :-
+    v_spore_print_color(A, v_green).
+\end{minted}
+\caption{Клаузе правила за MUSHROOM / DT у Prolog-у (без главе).}
+\label{code:prologbk-mushroom-dt}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% === MUSHROOM / RF === (order: sniper, sweet_spot, sweeper)
+rule(mushroom, rf, sniper, 7) :-
+    v_bruises(A, v_no), v_gill_spacing(A, v_close),
+    v_stalk_surface_above_ring(A, v_silky).
+rule(mushroom, rf, sniper, 4) :-
+    v_odor(A, v_foul).
+rule(mushroom, rf, sniper, 5) :-
+    v_gill_color(A, v_buff).
+rule(mushroom, rf, sweet_spot, 7) :-
+    v_bruises(A, v_no), v_gill_spacing(A, v_close),
+    v_stalk_surface_above_ring(A, v_silky).
+rule(mushroom, rf, sweet_spot, 4) :-
+    v_odor(A, v_foul).
+rule(mushroom, rf, sweet_spot, 5) :-
+    v_gill_color(A, v_buff).
+rule(mushroom, rf, sweeper, 8) :-
+    v_gill_spacing(A, v_close), v_stalk_surface_above_ring(A, v_silky).
+rule(mushroom, rf, sweeper, 5) :-
+    v_odor(A, v_foul).
+rule(mushroom, rf, sweeper, 6) :-
+    v_gill_color(A, v_buff).
+\end{minted}
+\caption{Клаузе правила за MUSHROOM / RF у Prolog-у (без главе).}
+\label{code:prologbk-mushroom-rf}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% === MUSHROOM / XGB === (order: sniper, sweet_spot, sweeper)
+rule(mushroom, xgb, sniper, 8) :-
+    v_odor(A, v_foul).
+rule(mushroom, xgb, sniper, 6) :-
+    v_gill_size(A, v_narrow), v_gill_spacing(A, v_close),
+    v_ring_type(A, v_evanescent).
+rule(mushroom, xgb, sniper, 7) :-
+    v_odor(A, v_creosote).
+rule(mushroom, xgb, sweet_spot, 8) :-
+    v_odor(A, v_foul).
+rule(mushroom, xgb, sweet_spot, 6) :-
+    v_gill_size(A, v_narrow), v_gill_spacing(A, v_close),
+    v_ring_type(A, v_evanescent).
+rule(mushroom, xgb, sweet_spot, 7) :-
+    v_odor(A, v_creosote).
+rule(mushroom, xgb, sweeper, 8) :-
+    v_odor(A, v_foul).
+rule(mushroom, xgb, sweeper, 6) :-
+    v_gill_size(A, v_narrow), v_gill_spacing(A, v_close),
+    v_ring_type(A, v_evanescent).
+rule(mushroom, xgb, sweeper, 7) :-
+    v_odor(A, v_creosote).
+\end{minted}
+\caption{Клаузе правила за MUSHROOM / XGB у Prolog-у (без главе).}
+\label{code:prologbk-mushroom-xgb}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% === ADULT / DT === (order: sniper, sweet_spot, sweeper)
+rule(adult, dt, sniper, 19) :-
+    v_relationship(A, v_husband), v_education(A, v_bachelors),
+    v_age(A, v_35_45).
+rule(adult, dt, sniper, 3) :-
+    v_capital_gain(A, v_high).
+rule(adult, dt, sniper, 15) :-
+    v_relationship(A, v_husband), v_capital_gain(A, v_medium).
+rule(adult, dt, sweet_spot, 5) :-
+    v_relationship(A, v_husband), v_education(A, v_bachelors).
+rule(adult, dt, sweet_spot, 6) :-
+    v_relationship(A, v_husband), v_age(A, v_55_65).
+rule(adult, dt, sweet_spot, 3) :-
+    v_capital_gain(A, v_medium).
+rule(adult, dt, sweeper, 3) :-
+    v_education(A, v_bachelors).
+rule(adult, dt, sweeper, 4) :-
+    v_education(A, v_advanced_degree).
+rule(adult, dt, sweeper, 2) :-
+    v_capital_gain(A, v_medium).
+\end{minted}
+\caption{Клаузе правила за ADULT / DT у Prolog-у (без главе).}
+\label{code:prologbk-adult-dt}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% === ADULT / RF === (order: sniper, sweet_spot, sweeper)
+rule(adult, rf, sniper, 38) :-
+    v_marital_status(A, v_married_civ_spouse),
+    v_education(A, v_advanced_degree).
+rule(adult, rf, sniper, 33) :-
+    v_marital_status(A, v_married_civ_spouse),
+    v_education(A, v_bachelors),
+    v_hours_per_week(A, v_21_40).
+rule(adult, rf, sniper, 36) :-
+    v_marital_status(A, v_married_civ_spouse),
+    v_education(A, v_bachelors),
+    v_hours_per_week(A, v_41_60).
+rule(adult, rf, sweet_spot, 7) :-
+    v_marital_status(A, v_married_civ_spouse),
+    v_education(A, v_bachelors).
+rule(adult, rf, sweet_spot, 8) :-
+    v_marital_status(A, v_married_civ_spouse),
+    v_education(A, v_advanced_degree).
+rule(adult, rf, sweet_spot, 9) :-
+    v_occupation(A, v_exec_managerial),
+    v_hours_per_week(A, v_41_60).
+rule(adult, rf, sweeper, 3) :-
+    v_education(A, v_bachelors).
+rule(adult, rf, sweeper, 4) :-
+    v_education(A, v_advanced_degree).
+rule(adult, rf, sweeper, 2) :-
+    v_capital_gain(A, v_medium).
+\end{minted}
+\caption{Клаузе правила за ADULT / RF у Prolog-у (без главе).}
+\label{code:prologbk-adult-rf}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[fontsize=\footnotesize, linenos, frame=lines]{prolog}
+% === ADULT / XGB === (order: sniper, sweet_spot, sweeper)
+rule(adult, xgb, sniper, 54) :-
+    v_education(A, v_advanced_degree),
+    v_marital_status(A, v_married_civ_spouse).
+rule(adult, xgb, sniper, 49) :-
+    v_education(A, v_bachelors),
+    v_marital_status(A, v_married_civ_spouse),
+    v_hours_per_week(A, v_21_40).
+rule(adult, xgb, sniper, 52) :-
+    v_education(A, v_bachelors),
+    v_marital_status(A, v_married_civ_spouse),
+    v_hours_per_week(A, v_41_60).
+rule(adult, xgb, sweet_spot, 10) :-
+    v_education(A, v_bachelors),
+    v_marital_status(A, v_married_civ_spouse).
+rule(adult, xgb, sweet_spot, 11) :-
+    v_education(A, v_advanced_degree),
+    v_marital_status(A, v_married_civ_spouse).
+rule(adult, xgb, sweet_spot, 13) :-
+    v_hours_per_week(A, v_41_60),
+    v_occupation(A, v_exec_managerial).
+rule(adult, xgb, sweeper, 3) :-
+    v_education(A, v_bachelors).
+rule(adult, xgb, sweeper, 5) :-
+    v_education(A, v_advanced_degree).
+rule(adult, xgb, sweeper, 2) :-
+    v_capital_gain(A, v_medium).
+\end{minted}
+\caption{Клаузе правила за ADULT / XGB у Prolog-у (без главе).}
+\label{code:prologbk-adult-xgb}
+\end{listing}
+
 
 \end{appendices}

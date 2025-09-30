@@ -5,6 +5,7 @@ from rule_check import compute_fidelity_confusion_for_folder, evaluate_folder, p
 from train_and_export import build_aleph_modes, train_and_export_aleph_single
 from rules import clean_aleph_program
 
+
 def run_aleph_with_files(model_type, dataset, aleph_folder):
     """
     Run Aleph by consulting only {dataset}.pl in the corresponding model_type folder, as in swi.sh.
@@ -12,7 +13,8 @@ def run_aleph_with_files(model_type, dataset, aleph_folder):
 
     # Build paths relative to this script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_dir = os.path.join(script_dir, "..", "outputs", dataset, model_type, aleph_folder)
+    base_dir = os.path.join(script_dir, "..", "outputs",
+                            dataset, model_type, aleph_folder)
     script_file = os.path.join(base_dir, f"{dataset}.pl")
 
     prolog = Prolog()
@@ -32,7 +34,8 @@ def run_aleph_with_files(model_type, dataset, aleph_folder):
     res = list(prolog.query("induce(Program)"))
     if res:
         program = res[0]['Program']
-        cleaned = clean_aleph_program(program, out_path=os.path.join(base_dir, f"{dataset}_hypothesis.pl"))
+        cleaned = clean_aleph_program(program, out_path=os.path.join(
+            base_dir, f"{dataset}_hypothesis.pl"))
         for c in cleaned:
             print(c)
         evaluate_folder(base_dir, dataset, model_type=model_type)
@@ -65,12 +68,12 @@ if __name__ == "__main__":
         print("Invalid dataset argument. Use one of: mushroom, adult")
         sys.exit(1)
 
-
     for model in models:
-        aleph_modes = build_aleph_modes(dataset)
+        aleph_modes = build_aleph_modes(dataset, model)
         if mode_index is not None:
             if mode_index not in aleph_modes:
-                print(f"Invalid mode index: {mode_index}. Available modes: {list(aleph_modes.keys())}")
+                print(
+                    f"Invalid mode index: {mode_index}. Available modes: {list(aleph_modes.keys())}")
                 sys.exit(1)
             modes_to_process = {mode_index: aleph_modes[mode_index]}
         else:
@@ -86,7 +89,8 @@ if __name__ == "__main__":
 
         elif action == "both":
             for mode_index, mode in modes_to_process.items():
-                print(f"=== Model: {model}, Dataset: {dataset}, Mode: {mode_index} ===")
+                print(
+                    f"=== Model: {model}, Dataset: {dataset}, Mode: {mode_index} ===")
                 train_and_export_aleph_single(model, dataset, mode_index)
                 run_aleph_with_files(model, dataset, mode_index)
 

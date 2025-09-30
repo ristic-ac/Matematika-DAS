@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from presets import ALEPH_PRESETS
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
@@ -49,146 +50,37 @@ models = {
     ),
 }
 
-def build_aleph_modes(dataset):
-    """
-    Build ALEPH_MODES dynamically, keeping noise ratios and minpos ratios predefined in the modes.
-    Separate modes for 'mushroom' and 'adult' datasets.
-    """
 
-    if dataset not in ["mushroom", "adult"]:
-        raise ValueError(f"Invalid dataset: {dataset}. Choose 'mushroom' or 'adult'.")
-    
-    if dataset == "mushroom":
-        return {
-            "sniper": {
-            "noise_ratio": 0.005,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, heuristic).\n"
-                ":- aleph_set(openlist, 40).\n"
-                ":- aleph_set(nodes, 80000).\n"
-                ":- aleph_set(evalfn, laplace).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.90).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-            "sweet_spot": {
-            "noise_ratio": 0.02,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, heuristic).\n"
-                ":- aleph_set(openlist, 64).\n"
-                ":- aleph_set(nodes, 100000).\n"
-                ":- aleph_set(evalfn, wracc).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.80).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-            "sweeper": {
-            "noise_ratio": 0.1,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, bf).\n"
-                ":- aleph_set(openlist, 1000).\n"
-                ":- aleph_set(nodes, 150000).\n"
-                ":- aleph_set(evalfn, coverage).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.70).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-        }
-    elif dataset == "adult":
-        return {
-            "sniper": {
-            "noise_ratio": 0.005,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, heuristic).\n"
-                ":- aleph_set(openlist, 60).\n"
-                ":- aleph_set(nodes, 100000).\n"
-                ":- aleph_set(evalfn, laplace).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.85).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-            "sweet_spot": {
-            "noise_ratio": 0.02,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, heuristic).\n"
-                ":- aleph_set(openlist, 80).\n"
-                ":- aleph_set(nodes, 120000).\n"
-                ":- aleph_set(evalfn, wracc).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.75).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-            "sweeper": {
-            "noise_ratio": 0.1,
-            "minpos_ratio": 0.01,
-            "settings_template": (
-                ":- aleph_set(search, bf).\n"
-                ":- aleph_set(openlist, 1500).\n"
-                ":- aleph_set(nodes, 200000).\n"
-                ":- aleph_set(evalfn, coverage).\n"
-                ":- aleph_set(clauselength, {clauselength_value}).\n"
-                ":- aleph_set(minacc, 0.65).\n"
-                ":- aleph_set(minpos, {minpos_value}).\n"
-                ":- aleph_set(noise, {noise_value}).\n"
-            )
-            },
-        }
-
-
-def build_aleph_noise_settings(num_samples, aleph_preset, dataset, model_type):
+def build_aleph_modes(dataset, model_type):
     """
-    Generate ALEPH_MODES by filling in noise, minpos, and clauselength values based on num_samples and folder_name.
+    Return hard-coded ALEPH presets for each dataset, model, and mode.
     """
 
-    modes = build_aleph_modes(dataset)
+    # Duplicate dt presets for rf and xgb
+    for ds in ALEPH_PRESETS:
+        ALEPH_PRESETS[ds]["rf"] = ALEPH_PRESETS[ds]["dt"]
+        ALEPH_PRESETS[ds]["xgb"] = ALEPH_PRESETS[ds]["dt"]
+
+    if dataset not in ALEPH_PRESETS:
+        raise ValueError(f"Invalid dataset: {dataset}")
+    if model_type not in ALEPH_PRESETS[dataset]:
+        raise ValueError(f"Invalid model_type: {model_type}")
+
+    return ALEPH_PRESETS[dataset][model_type]
+
+
+def build_aleph_noise_settings(aleph_preset, dataset, model_type):
+    """
+    Return the hard-coded ALEPH mode settings.
+    Ignores num_samples (kept for compatibility with old calls).
+    """
+    modes = build_aleph_modes(dataset, model_type)
     mode = modes.get(aleph_preset)
     if mode is None:
-        raise ValueError(f"Invalid folder name: {aleph_preset}. Valid folders are: {list(modes.keys())}")
-
-    # Calculate clauselength based on the number of rows in feature_columns.txt
-    model_dir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
-    feature_columns_path = os.path.join(model_dir, 'feature_columns.txt')
-    clauselength_value = 4  # Default value
-    if os.path.exists(feature_columns_path):
-        with open(feature_columns_path, 'r') as f:
-            num_features = sum(1 for _ in f)
-        if aleph_preset == "sniper":
-            clauselength_value = max(2, min(10, num_features))  # N for sniper
-        elif aleph_preset == "sweeper":
-            clauselength_value = 2  # Fixed value for sweeper
-        elif aleph_preset == "sweet_spot":
-            clauselength_value = max(2, min(10, (num_features + 2) // 2))  # Something in between
-    else:
-        print(f"Warning: feature_columns.txt not found at {feature_columns_path}. Using default clauselength of 4.")
-        exit(1)
-
-    num_positive_samples = int(num_samples / 2)  # Assuming balanced classes after preprocessing
-    num_negative_samples = int(num_samples / 2)  # Assuming balanced classes after preprocessing
-    noise_value = int(num_negative_samples * mode["noise_ratio"])    # We use half the training set size because of class balancing
-    minpos_value = max(1, int(num_positive_samples * mode["minpos_ratio"]))
-    mode["settings"] = mode["settings_template"].format(
-    noise_value=noise_value,
-    minpos_value=minpos_value,
-    clauselength_value=clauselength_value
-    )
-    del mode["settings_template"]  # Remove the template after use
-
+        raise ValueError(
+            f"Invalid preset: {aleph_preset}. Valid: {list(modes.keys())}")
     return mode
+
 
 def _to_atom(s: str) -> str:
     """
@@ -209,6 +101,7 @@ def _to_atom(s: str) -> str:
         s = 'v_' + s
     return s.lower()
 
+
 def save_feature_importances(clf, X, outdir, model_type):
     """
     Save and print feature importances for supported models.
@@ -216,13 +109,15 @@ def save_feature_importances(clf, X, outdir, model_type):
     if model_type in ["dt", "rf", "xgb"]:
         importances = clf.feature_importances_
         feature_names = X.columns
-        feat_imp = pd.Series(importances, index=feature_names).sort_values(ascending=False)
+        feat_imp = pd.Series(
+            importances, index=feature_names).sort_values(ascending=False)
         print("Feature importances:")
         print(feat_imp)
         # Optionally, save to file
         imp_path = os.path.join(outdir, 'feature_importances.csv')
         feat_imp.to_csv(imp_path, header=True)
         print("Feature importances saved to:", imp_path)
+
 
 def save_and_print_confusion_matrix_model(clf, y_test, y_pred, outdir, model_type, dataset=None):
     y_pred = [int(x) for x in y_pred]
@@ -245,8 +140,10 @@ def save_and_print_confusion_matrix_model(clf, y_test, y_pred, outdir, model_typ
     # Switch order of custom_labels to swap TP and TN
     custom_labels_swapped = custom_labels[::-1]
 
-    cm_raw = confusion_matrix(y_test_labels, y_pred_labels, labels=custom_labels_swapped)
-    df_cm = pd.DataFrame(cm_raw, index=custom_labels_swapped, columns=custom_labels_swapped)
+    cm_raw = confusion_matrix(
+        y_test_labels, y_pred_labels, labels=custom_labels_swapped)
+    df_cm = pd.DataFrame(cm_raw, index=custom_labels_swapped,
+                         columns=custom_labels_swapped)
 
     print("Confusion Matrix:")
     print(df_cm)
@@ -255,13 +152,15 @@ def save_and_print_confusion_matrix_model(clf, y_test, y_pred, outdir, model_typ
     ax = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues')
     ax.set_xlabel('Predicted')
     ax.set_ylabel('Actual')
-    ax.set_title(f'Confusion Matrix ({model_type.upper()}) for {dataset.capitalize() if dataset else "Dataset"}')
+    ax.set_title(
+        f'Confusion Matrix ({model_type.upper()}) for {dataset.capitalize() if dataset else "Dataset"}')
 
     os.makedirs(outdir, exist_ok=True)
     cm_path = os.path.join(outdir, 'confusion_matrix_model.png')
     plt.savefig(cm_path, bbox_inches="tight")
     plt.close()
     print("Confusion matrix saved to:", cm_path)
+
 
 def plot_feature_correlation_heatmap(X, dataset):
     """
@@ -274,11 +173,13 @@ def plot_feature_correlation_heatmap(X, dataset):
     corr = X_enc_df.corr()
     sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', square=True)
     plt.title(f'Feature Correlation Heatmap ({dataset.capitalize()})')
-    heatmap_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, f'{dataset}_feature_correlation_heatmap.png')
+    heatmap_path = os.path.join(os.path.dirname(
+        __file__), '..', 'outputs', dataset, f'{dataset}_feature_correlation_heatmap.png')
     os.makedirs(os.path.dirname(heatmap_path), exist_ok=True)
     plt.savefig(heatmap_path)
     plt.close()
     print("Feature correlation heatmap saved to:", heatmap_path)
+
 
 def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     cache_dir = os.path.join(os.path.dirname(__file__), '..', 'cache')
@@ -286,7 +187,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     cache_path = os.path.join(cache_dir, f"{dataset}.parquet")
 
     if os.path.exists(cache_path):
-        print(f"Loading cached {dataset.capitalize()} dataset from {cache_path}...")
+        print(
+            f"Loading cached {dataset.capitalize()} dataset from {cache_path}...")
         df = pd.read_parquet(cache_path)
     else:
         print(f"Downloading {dataset.capitalize()} dataset...")
@@ -300,7 +202,6 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         df.to_parquet(cache_path)
         print(f"Cached {dataset.capitalize()} dataset at {cache_path}.")
 
-    
     # If mushroom dataset, rename 'bruises%3f' to 'bruises' and fix values
     if dataset == "mushroom":
         df = preprocess_mushroom_dataset(df)
@@ -312,30 +213,35 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     # Drop rows with missing values
     if X.isnull().any().any():
         unique_rows_before = df.shape[0]
-        print(f"Dataset has {unique_rows_before} rows before dropping missing values.")
+        print(
+            f"Dataset has {unique_rows_before} rows before dropping missing values.")
         print("Ratio of missing data per feature:")
         print(X.isnull().mean())
         # Plot the correlation between stalk-root and class for mushroom dataset
         if dataset == "mushroom":
             if pd.api.types.is_categorical_dtype(df['stalk-root']):
-                df['stalk-root'] = df['stalk-root'].cat.add_categories(['unknown'])
+                df['stalk-root'] = df['stalk-root'].cat.add_categories([
+                                                                       'unknown'])
             df['stalk-root'] = df['stalk-root'].fillna('unknown')
             # Create contigency table
-            cont_table = pd.crosstab(df['stalk-root'], df['class'], dropna=False)
+            cont_table = pd.crosstab(
+                df['stalk-root'], df['class'], dropna=False)
             cont_table_norm = cont_table.div(cont_table.sum(axis=1), axis=0)
             plt.figure(figsize=(8, 6))
             sns.heatmap(cont_table_norm, annot=True, fmt=".2f", cmap='Blues')
             plt.title('Normalized Contingency Table: stalk-root vs class')
             plt.xlabel('class')
             plt.ylabel('stalk-root')
-            heatmap_path = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, 'charts' , 'categorical', f'{dataset}_stalk_root_vs_class_heatmap.png')
+            heatmap_path = os.path.join(os.path.dirname(
+                __file__), '..', 'outputs', dataset, 'charts', 'categorical', f'{dataset}_stalk_root_vs_class_heatmap.png')
             os.makedirs(os.path.dirname(heatmap_path), exist_ok=True)
             plt.savefig(heatmap_path)
             plt.close()
             print("Contingency table heatmap saved to:", heatmap_path)
         missing_rows = df[df.isnull().any(axis=1)]
         num_missing = missing_rows.shape[0]
-        print(f"Missing values detected. {num_missing} unique rows will be dropped due to missing values.")
+        print(
+            f"Missing values detected. {num_missing} unique rows will be dropped due to missing values.")
         df = df.dropna()
         X = df.drop('class', axis=1)
         y = df['class']
@@ -363,7 +269,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     else:
         print("No numerical features found.")
 
-    charts_outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, 'charts')
+    charts_outdir = os.path.join(os.path.dirname(
+        __file__), '..', 'outputs', dataset, 'charts')
     numerical_outdir = os.path.join(charts_outdir, 'numerical')
     categorical_outdir = os.path.join(charts_outdir, 'categorical')
 
@@ -378,15 +285,17 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     if y.value_counts().nunique() > 1:
         print("Balancing classes by downsampling majority class...")
         df_minority = df[y == minority_class]
-        df_majority = df[y != minority_class].sample(n=minority_count, random_state=42)
-        df = pd.concat([df_minority, df_majority]).sample(frac=1, random_state=42).reset_index(drop=True)
+        df_majority = df[y != minority_class].sample(
+            n=minority_count, random_state=42)
+        df = pd.concat([df_minority, df_majority]).sample(
+            frac=1, random_state=42).reset_index(drop=True)
         X = df.drop('class', axis=1)
         y = df['class']
         print("New class distribution:")
         print(y.value_counts())
     else:
         print("Classes are already balanced.")
-    
+
     # Print class distribution after balancing
     print("Final class distribution:")
     print(y.value_counts())
@@ -401,10 +310,12 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         print(X.describe(include='all'))
 
     # If feature_importances.csv exists, load and keep only top 90%
-    outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
+    outdir = os.path.join(os.path.dirname(__file__), '..',
+                          'outputs', dataset, model_type)
     imp_path = os.path.join(outdir, 'feature_importances.csv')
     if os.path.exists(imp_path):
-        print(f"Loading feature importances from {imp_path} to select top features...")
+        print(
+            f"Loading feature importances from {imp_path} to select top features...")
         feat_imp = pd.read_csv(imp_path, index_col=0)
         if feat_imp.shape[1] == 1:
             feat_imp = feat_imp.iloc[:, 0]
@@ -417,8 +328,10 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
             top_features.append(next_feature)
         print("Top features and their importances:")
         print(feat_imp.loc[top_features])
-        print(f"Selected top {len(top_features)} features covering at least 90% importance.")
-        print("Total sum of importances for selected features:", feat_imp.loc[top_features].sum())
+        print(
+            f"Selected top {len(top_features)} features covering at least 90% importance.")
+        print("Total sum of importances for selected features:",
+              feat_imp.loc[top_features].sum())
         X = X[top_features]
 
     # Keep original X for ILP; encode only for sklearn
@@ -449,12 +362,14 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         y_test = y_test.map({'<=50K': 0, '>50K': 1}).astype(int)
 
     if model_type not in models:
-        raise ValueError(f"Unsupported model_type '{model_type}'. Choose from {list(models.keys())}.")
+        raise ValueError(
+            f"Unsupported model_type '{model_type}'. Choose from {list(models.keys())}.")
 
     base_model, param_grid = models[model_type]
 
     # Output paths (needed for params_path)
-    outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
+    outdir = os.path.join(os.path.dirname(__file__), '..',
+                          'outputs', dataset, model_type)
     os.makedirs(outdir, exist_ok=True)
     params_path = os.path.join(outdir, 'best_params.txt')
 
@@ -465,7 +380,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
         y_pred = pd.Series(y_pred, index=y_test.index)
-        grid = type('DummyGrid', (), {'best_params_': best_params})()  # Dummy for later use
+        # Dummy for later use
+        grid = type('DummyGrid', (), {'best_params_': best_params})()
     else:
         # Grid search
         grid = GridSearchCV(
@@ -493,7 +409,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         exit(0)
 
     # Output paths
-    outdir = os.path.join(os.path.dirname(__file__), '..', 'outputs', dataset, model_type)
+    outdir = os.path.join(os.path.dirname(__file__), '..',
+                          'outputs', dataset, model_type)
     os.makedirs(outdir, exist_ok=True)
 
     # Save which columns were used for training
@@ -512,7 +429,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     else:
         label_map = {i: str(c) for i, c in enumerate(clf.classes_)}
 
-    report = {label_map[int(k)] if k.isdigit() else k: v for k, v in report.items()}
+    report = {label_map[int(k)] if k.isdigit()
+              else k: v for k, v in report.items()}
     report_path = os.path.join(outdir, 'classification_report.json')
     with open(report_path, 'w') as f:
         json.dump(report, f, indent=4)
@@ -528,21 +446,31 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
         print("Feature importances computed and saved. Exiting to allow re-run with top features only.")
         sys.exit(0)
 
+    # Save to a file number of traning and testing samples
+    split_path = os.path.join(outdir, 'train_test_split_by_class.txt')
+    with open(split_path, 'w') as f:
+        f.write("Training samples by class:\n")
+        f.write(y_train.value_counts().to_string() + "\n\n")
+        f.write("Testing samples by class:\n")
+        f.write(y_test.value_counts().to_string() + "\n")
+    print("Train/test split info by class saved to:", split_path)
+
     # Append aleph folder to outdir for Aleph files
     outdir = os.path.join(outdir, aleph_preset)
     os.makedirs(outdir, exist_ok=True)
     print("Aleph output directory:", outdir)
-    
+
     # Stable IDs for all examples (train + test)
     all_ids = [f"m{i+1}" for i in range(len(X))]
     id_map = pd.Series(all_ids, index=X.index)
 
-    pred_label = 'edible' if dataset == "mushroom" else 'gt_50K'
+    pred_label = 'poisonous' if dataset == "mushroom" else 'gt_50K'
 
     # Build complete background knowledge (training + testing)
     bg = [":- begin_bg."]
     for orig_idx in X.index:  # X_full = training + testing data
-        mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
+        mid = f"m{orig_idx+1}" if isinstance(orig_idx,
+                                             int) else f"m{X.index.get_loc(orig_idx)+1}"
         row = X.loc[orig_idx]
         for col, val in row.items():
             ftr = _to_atom(col)
@@ -554,7 +482,8 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     pos = [":- begin_in_pos."]
     neg = [":- begin_in_neg."]
     for orig_idx, label in y_train.items():
-        mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
+        mid = f"m{orig_idx+1}" if isinstance(orig_idx,
+                                             int) else f"m{X.index.get_loc(orig_idx)+1}"
         if label == 1:
             pos.append(f"{pred_label}({mid}).")
         else:
@@ -564,30 +493,35 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
 
     # Write Aleph training program with full BG + training pos/neg
     pl_path = os.path.join(outdir, f"{dataset}.pl")
-    aleph_hyperparams = build_aleph_noise_settings(len(y_train), aleph_preset, dataset, model_type)["settings"]
+    aleph_hyperparams = build_aleph_noise_settings(
+        aleph_preset, dataset, model_type)["settings"]
     with open(pl_path, "w") as f:
         aleph_preamble = generate_aleph_header_lines()
         aleph_modes = generate_aleph_modes(pred_label, X.columns)
-        f.write("\n".join([aleph_preamble] + [aleph_hyperparams] + [aleph_modes] + bg + pos + neg))
+        f.write("\n".join([aleph_preamble] +
+                [aleph_hyperparams] + [aleph_modes] + bg + pos + neg))
     print("Aleph training program written to:", pl_path)
 
     # Write positive test examples into test.f
     test_f_path = os.path.join(outdir, f'{dataset}_test.f')
     with open(test_f_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 1]))
+        f.write("\n".join(
+            [f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 1]))
     print("Positive test examples written to:", test_f_path)
 
     # Write negative test examples into test.n
     test_n_path = os.path.join(outdir, f'{dataset}_test.n')
     with open(test_n_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 0]))
+        f.write("\n".join(
+            [f"{pred_label}({id_map[idx]})." for idx, label in y_pred.items() if label == 0]))
     print("Negative test examples written to:", test_n_path)
 
     # Write test background knowledge into test.b
     test_b_path = os.path.join(outdir, f'{dataset}_test.b')
     with open(test_b_path, "w") as f:
         for orig_idx in y_pred.index:
-            mid = f"m{orig_idx+1}" if isinstance(orig_idx, int) else f"m{X.index.get_loc(orig_idx)+1}"
+            mid = f"m{orig_idx+1}" if isinstance(orig_idx,
+                                                 int) else f"m{X.index.get_loc(orig_idx)+1}"
             row = X.loc[orig_idx]
             for col, val in row.items():
                 ftr = _to_atom(col)
@@ -600,17 +534,21 @@ def train_and_export_aleph_single(model_type, dataset, aleph_preset):
     y_true_n_path = os.path.join(outdir, f'{dataset}_y_true.n')
 
     with open(y_true_f_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 1]))
+        f.write("\n".join(
+            [f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 1]))
     print("Positive y_test labels written to:", y_true_f_path)
 
     with open(y_true_n_path, "w") as f:
-        f.write("\n".join([f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
+        f.write("\n".join(
+            [f"{pred_label}({id_map[idx]})." for idx, label in y_test.items() if label == 0]))
     print("Negative y_test labels written to:", y_true_n_path)
 
 # Function that creates histograms for numerical features in the outdir
 # Name should include dataset name for clarity (e.g., adult_age_histogram.png)
 # X represents the inputs DataFrame, y the target Series
 # Outdir represents the output directory for saving plots
+
+
 def generate_overlapping_histograms(X, y, outdir, dataset_name):
     # Identify numerical columns
     num_cols = X.select_dtypes(include=[np.number]).columns
@@ -620,9 +558,11 @@ def generate_overlapping_histograms(X, y, outdir, dataset_name):
 
     # Create overlapping histograms for each numerical column
     for col in num_cols:
-        plot_path = os.path.join(outdir, f'{dataset_name}_{col}_overlap_histogram.png')
+        plot_path = os.path.join(
+            outdir, f'{dataset_name}_{col}_overlap_histogram.png')
         if os.path.exists(plot_path):
-            print(f"Overlapping histogram for {col} already exists at {plot_path}, skipping.")
+            print(
+                f"Overlapping histogram for {col} already exists at {plot_path}, skipping.")
             continue
         plt.figure(figsize=(8, 6))
         # Compute common bins for all classes
@@ -637,7 +577,8 @@ def generate_overlapping_histograms(X, y, outdir, dataset_name):
                 label=str(class_value),
                 alpha=0.5
             )
-        plt.title(f'Overlapping Histogram of {col} ({dataset_name.capitalize()})')
+        plt.title(
+            f'Overlapping Histogram of {col} ({dataset_name.capitalize()})')
         plt.xlabel(col)
         plt.ylabel('Density')
         plt.legend(title='Class')
@@ -645,6 +586,7 @@ def generate_overlapping_histograms(X, y, outdir, dataset_name):
         plt.savefig(plot_path)
         plt.close()
         print(f"Saved overlapping histogram for {col} to {plot_path}")
+
 
 def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50):
     # Identify categorical columns
@@ -656,13 +598,14 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
     for col in cat_cols:
         plot_path = os.path.join(outdir, f'{dataset_name}_{col}_barchart.png')
         if os.path.exists(plot_path):
-            print(f"Bar chart for {col} already exists at {plot_path}, skipping.")
+            print(
+                f"Bar chart for {col} already exists at {plot_path}, skipping.")
             continue
 
         plt.figure(figsize=(10, 6))
         plot_df = pd.concat([X[col], y], axis=1)
         plot_df.columns = [col, 'target']
-        
+
         # Count values to decide on log scale
         counts = plot_df.groupby([col, 'target'], observed=True).size()
         if len(counts) > 0:
@@ -671,7 +614,7 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
             use_log = (max_count / min_count) > log_threshold
         else:
             use_log = False
-        
+
         # Plot
         ax = sns.countplot(data=plot_df, x=col, hue='target', dodge=True)
         plt.title(f'Bar Chart of {col} by Class ({dataset_name.capitalize()})')
@@ -679,7 +622,7 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
         plt.ylabel('Count (log scale)' if use_log else 'Count')
         plt.legend(title='Class')
         plt.xticks(rotation=45, ha='right')
-        
+
         # Apply log scale if needed
         if use_log:
             ax.set_yscale('log')
@@ -689,7 +632,8 @@ def generate_categorical_barcharts(X, y, outdir, dataset_name, log_threshold=50)
         plt.tight_layout()
         plt.savefig(plot_path)
         plt.close()
-        print(f"Saved bar chart for {col} to {plot_path} (log scale: {use_log})")
+        print(
+            f"Saved bar chart for {col} to {plot_path} (log scale: {use_log})")
 
 
 def load_best_params(params_path):
@@ -744,21 +688,25 @@ def load_best_params(params_path):
 
     return best_params
 
+
 def bin_adult_dataset(X):
     # Age bins
     age_bins = [0, 25, 35, 45, 55, 65, 150]
     age_labels = ["<25", "25-35", "35-45", "45-55", "55-65", "65+"]
-    X["age"] = pd.cut(X["age"].astype(float), bins=age_bins, labels=age_labels, right=False)
+    X["age"] = pd.cut(X["age"].astype(float), bins=age_bins,
+                      labels=age_labels, right=False)
 
     # Hours-per-week bins
     hpw_bins = [0, 21, 41, 61, 1000]
     hpw_labels = ["≤20", "21-40", "41-60", ">60"]
-    X["hours-per-week"] = pd.cut(X["hours-per-week"].astype(float), bins=hpw_bins, labels=hpw_labels, right=False)
+    X["hours-per-week"] = pd.cut(X["hours-per-week"].astype(float),
+                                 bins=hpw_bins, labels=hpw_labels, right=False)
 
     # Capital-gain bins using quartiles (non-zero values only)
     cg = X["capital-gain"].astype(float)
     cg_q25 = cg[cg > 0].quantile(0.25)
     cg_q75 = cg[cg > 0].quantile(0.75)
+
     def cg_bin(val):
         if val == 0:
             return "0"
@@ -774,6 +722,7 @@ def bin_adult_dataset(X):
     cl = X["capital-loss"].astype(float)
     cl_q25 = cl[cl > 0].quantile(0.25)
     cl_q75 = cl[cl > 0].quantile(0.75)
+
     def cl_bin(val):
         if val == 0:
             return "0"
@@ -789,7 +738,8 @@ def bin_adult_dataset(X):
     X["fnlwgt"] = np.log1p(X["fnlwgt"].astype(float))
     fnlwgt_bins = X["fnlwgt"].quantile([0, 0.25, 0.5, 0.75, 1.0]).values
     fnlwgt_labels = ["Q1", "Q2", "Q3", "Q4"]
-    X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins, labels=fnlwgt_labels, include_lowest=True)
+    X["fnlwgt"] = pd.cut(X["fnlwgt"], bins=fnlwgt_bins,
+                         labels=fnlwgt_labels, include_lowest=True)
 
     if "education" in X.columns:
         X["education"] = X["education"].map(
@@ -802,12 +752,13 @@ def bin_adult_dataset(X):
                 'Other'
             )
         )
-    
+
     # Drop education-num as it's redundant now
     if "education-num" in X.columns:
         X = X.drop(columns=["education-num"])
 
     return X
+
 
 def preprocess_mushroom_dataset(df):
     # Rename column if needed
@@ -847,6 +798,8 @@ def preprocess_mushroom_dataset(df):
             df[col] = df[col].map(mapping)
 
     return df
+
+
 def generate_aleph_header_lines():
     """
     Returns the first two lines of the Aleph preface header.
@@ -855,6 +808,7 @@ def generate_aleph_header_lines():
         ":- use_module(library(aleph)).",  # Load Aleph library
         ":- aleph."                        # Initialize Aleph
     ])
+
 
 def generate_aleph_modes(pred_label, features):
     """
@@ -869,6 +823,9 @@ def generate_aleph_modes(pred_label, features):
     """
     modes = [f":- modeh(*, {pred_label}(+id))."]  # Head mode: target predicate
     for feature in features:
-        modes.append(f":- modeb(1, {_to_atom(feature)}(+id, #value)).")  # Body mode: individual feature
-        modes.append(f":- determination({pred_label}/1, {_to_atom(feature)}/2).")  # Allow feature in rules for pred_label
+        # Body mode: individual feature
+        modes.append(f":- modeb(1, {_to_atom(feature)}(+id, #value)).")
+        # Allow feature in rules for pred_label
+        modes.append(
+            f":- determination({pred_label}/1, {_to_atom(feature)}/2).")
     return "\n".join(modes)

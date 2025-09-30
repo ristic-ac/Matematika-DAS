@@ -18,3 +18,11 @@ _minted-main
 main.pdf
 scripts/output.log
 bkp/
+scripts/train_and_export copy.py
+scripts/train_and_export copy 2.py
+scripts/out/
+seminarski/.vscode/settings.bkp.json
+seminarski/.vscode/settings.json
+scripts/all_results.json
+scripts/.prettierrc
+seminarski/prezentacija.pdf

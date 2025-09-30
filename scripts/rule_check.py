@@ -11,6 +11,7 @@ from statistics import mean
 Feature = Tuple[str, str]
 Rule = Tuple[str, List[Feature]]
 
+
 def parse_rules(rule_file: str) -> List[Rule]:
     """
     Parse rules of the form:
@@ -30,9 +31,11 @@ def parse_rules(rule_file: str) -> List[Rule]:
                 continue
             target = m_head.group(1)
             body = m_head.group(2)
-            conds = [(p.strip(), v.strip()) for (p, v) in cond_pat.findall(body)]
+            conds = [(p.strip(), v.strip())
+                     for (p, v) in cond_pat.findall(body)]
             rules.append((target, conds))
     return rules
+
 
 def load_features(b_file: str) -> Dict[str, Dict[str, Set[str]]]:
     """
@@ -56,6 +59,7 @@ def load_features(b_file: str) -> Dict[str, Dict[str, Set[str]]]:
             feats.setdefault(ex, {}).setdefault(pred, set()).add(val)
     return feats
 
+
 def load_examples(f_file: str) -> List[Tuple[str, str]]:
     """
     Examples remain unary:
@@ -74,6 +78,7 @@ def load_examples(f_file: str) -> List[Tuple[str, str]]:
                 exs.append((m.group(1).strip(), m.group(2).strip()))
     return exs
 
+
 def predicts(rules: List[Rule], ex_id: str,
              features: Dict[str, Dict[str, Set[str]]],
              target_pred: str) -> bool:
@@ -89,6 +94,7 @@ def predicts(rules: List[Rule], ex_id: str,
         if all(pred in fdict and val in fdict[pred] for pred, val in conds):
             return True
     return False
+
 
 def compute_fidelity_confusion_for_folder(folder: str, dataset: str) -> Dict[str, float]:
     rule_file = os.path.join(folder, f"{dataset}_hypothesis.pl")
@@ -125,6 +131,7 @@ def compute_fidelity_confusion_for_folder(folder: str, dataset: str) -> Dict[str
 
     return {"TP": TP, "FP": FP, "FN": FN, "TN": TN, "Accuracy": acc}
 
+
 def print_confusion_matrix_distillate(metrics: Dict[str, int], outdir: str, suffix):
     TP = metrics["TP"]
     FP = metrics["FP"]
@@ -144,15 +151,18 @@ def print_confusion_matrix_distillate(metrics: Dict[str, int], outdir: str, suff
     print("Pred ")
     print(f"     -  {FN:<5}        {TN:<5}        {total_pred_neg:<5}")
     print()
-    print(f"        {total_pos:<5}        {total_neg:<5}        {total_all:<5}")
+    print(
+        f"        {total_pos:<5}        {total_neg:<5}        {total_all:<5}")
 
     if outdir:
         os.makedirs(outdir, exist_ok=True)
-        cm_values_path = os.path.join(outdir, f"confusion_matrix_values_{suffix}.txt")
+        cm_values_path = os.path.join(
+            outdir, f"confusion_matrix_values_{suffix}.txt")
         with open(cm_values_path, "w") as f:
             f.write("TP\tFP\tFN\tTN\n")
             f.write(f"{TP}\t{FP}\t{FN}\t{TN}\n")
         print(f"Confusion matrix values saved to: {cm_values_path}")
+
 
 def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str, dataset: str, suffix: str):
     """
@@ -183,7 +193,8 @@ def plot_confusion_matrix_distillate(metrics: dict, outdir: str, model_type: str
     )
     ax.set_xlabel("Predicted")
     ax.set_ylabel("Actual")
-    ax.set_title(f'Confusion Matrix ({model_type.upper()}) for {dataset.capitalize() if dataset else "Dataset"}')
+    ax.set_title(
+        f'Confusion Matrix ({model_type.upper()}) for {dataset.capitalize() if dataset else "Dataset"}')
 
     os.makedirs(outdir, exist_ok=True)
     cm_path = os.path.join(outdir, f"confusion_matrix_{suffix}.png")
@@ -218,7 +229,6 @@ def load_y_true(folder: str, dataset: str) -> Tuple[Optional[str], Set[str]]:
             pred_name = exs[0][0]
         neg_ids |= {ex for _, ex in exs}
 
-
     return pred_name, pos_ids
 
 
@@ -233,7 +243,7 @@ def compute_true_confusion_for_folder(folder: str, dataset: str) -> Tuple[Option
 
     Returns (cm_true_dict_or_None, acc_true_or_None)
     """
-    rule_file   = os.path.join(folder, f"{dataset}_hypothesis.pl")
+    rule_file = os.path.join(folder, f"{dataset}_hypothesis.pl")
     bg_file = os.path.join(folder, f"{dataset}_test.b")
 
     # Required: rules and some background facts
@@ -248,7 +258,7 @@ def compute_true_confusion_for_folder(folder: str, dataset: str) -> Tuple[Option
     y_pred_name, y_pos_ids = load_y_true(folder, dataset)
     if not y_pos_ids:
         return None, None
-    
+
     # Load rules + background facts
     rules = parse_rules(rule_file)
     features = load_features(b_file)
@@ -267,7 +277,7 @@ def compute_true_confusion_for_folder(folder: str, dataset: str) -> Tuple[Option
     TP = FP = FN = TN = 0
     for ex in test_ids:
         y_true = (ex in y_pos_ids)
-        y_hat  = predicts(rules, ex, features, target_pred)
+        y_hat = predicts(rules, ex, features, target_pred)
         if y_true and y_hat:
             TP += 1
         elif (not y_true) and y_hat:
@@ -282,6 +292,7 @@ def compute_true_confusion_for_folder(folder: str, dataset: str) -> Tuple[Option
     cm_true = {"TP": TP, "FP": FP, "FN": FN, "TN": TN, "Accuracy": acc_true}
     return cm_true, acc_true
 
+
 def compute_compactness(folder: str, dataset: str) -> Dict[str, Union[int, float]]:
     """
     Compactness: number of target rules and their average body length.
@@ -293,9 +304,11 @@ def compute_compactness(folder: str, dataset: str) -> Dict[str, Union[int, float
     target_pred = rules[0][0] if rules else None
 
     # Compactness computed for rules of the target predicate
-    target_rules = [(h, conds) for (h, conds) in rules if (target_pred is None or h == target_pred)]
+    target_rules = [(h, conds) for (h, conds) in rules if (
+        target_pred is None or h == target_pred)]
     num_rules = len(target_rules)
-    avg_body_len = (mean(len(conds) for _, conds in target_rules) if target_rules else 0.0)
+    avg_body_len = (mean(len(conds)
+                    for _, conds in target_rules) if target_rules else 0.0)
     comp = {"num_rules": num_rules, "avg_body_len": avg_body_len}
     return comp
 
@@ -311,8 +324,10 @@ def evaluate_folder(folder: str, dataset: str, model_type: str) -> Dict[str, Uni
     # Fidelity confusion (already implemented in your code)
     cm_fid = compute_fidelity_confusion_for_folder(folder, dataset)
     # Plot and print confusion matrix
-    print_confusion_matrix_distillate(cm_fid, outdir=folder, suffix="wrt_model_predictions")
-    plot_confusion_matrix_distillate(cm_fid, outdir=folder, model_type=model_type, dataset=dataset, suffix="wrt_model_predictions")
+    print_confusion_matrix_distillate(
+        cm_fid, outdir=folder, suffix="wrt_model_predictions")
+    plot_confusion_matrix_distillate(
+        cm_fid, outdir=folder, model_type=model_type, dataset=dataset, suffix="wrt_model_predictions")
     # Fidelity accuracy
     fidelity = cm_fid.get("Accuracy", None)
 
@@ -320,15 +335,18 @@ def evaluate_folder(folder: str, dataset: str, model_type: str) -> Dict[str, Uni
     cm_true, acc_true = compute_true_confusion_for_folder(folder, dataset)
     # Plot and print true confusion matrix if available
     if cm_true:
-        print_confusion_matrix_distillate(cm_true, outdir=folder, suffix="wrt_true_labels")
-        plot_confusion_matrix_distillate(cm_true, outdir=folder, model_type=model_type, dataset=dataset, suffix="wrt_true_labels")
+        print_confusion_matrix_distillate(
+            cm_true, outdir=folder, suffix="wrt_true_labels")
+        plot_confusion_matrix_distillate(
+            cm_true, outdir=folder, model_type=model_type, dataset=dataset, suffix="wrt_true_labels")
 
     comp = compute_compactness(folder, dataset)
 
     # Compute coverage as recall on the fidelity confusion
     TP = cm_fid.get("TP", 0)
     FN = cm_fid.get("FN", 0)
-    cov = {"value": (TP / (TP + FN) if (TP + FN) > 0 else 0.0), "covered": TP, "total": (TP + FN)}
+    cov = {"value": (TP / (TP + FN) if (TP + FN) > 0 else 0.0),
+           "covered": TP, "total": (TP + FN)}
 
     # Save the evaluation results to a file in the current folder
     eval_results = {
@@ -344,3 +362,98 @@ def evaluate_folder(folder: str, dataset: str, model_type: str) -> Dict[str, Uni
     print("Evaluation results saved to:", eval_results_path)
 
     return eval_results
+
+# Extract top 3 rules by coverage on positive test examples
+
+
+def top_rules(folder: str, dataset: str, model_type: str, aleph_preset: str):
+    """
+    Returns a list of up to 3 dicts:
+      { "head": <str>, "conds": <list>, "covered": <int>, "coverage_rate": <float>, "n_pos": <int> }
+    Coverage is computed over positive test examples only.
+    """
+    rule_file = os.path.join(folder, f"{dataset}_hypothesis.pl")
+    b_file = os.path.join(folder, f"{dataset}_test.b")
+    fpos_file = os.path.join(folder, f"{dataset}_test.f")
+    fneg_file = os.path.join(folder, f"{dataset}_test.n")
+
+    # expected: List[Tuple[str, List]]
+    rules = parse_rules(rule_file)
+    features = load_features(b_file)
+    pos_examples = load_examples(fpos_file)
+    # loaded if your predicts() needs it
+    _ = load_examples(fneg_file)
+
+    if not pos_examples:
+        raise ValueError("No positive examples found.")
+    target_pred = pos_examples[0][0]
+    n_pos = len(pos_examples)
+
+    rule_coverage: List[Tuple[Tuple[str, List], int]] = []
+    for rule in rules:
+        rule_head, rule_conds = rule
+        if rule_head != target_pred:
+            continue
+        covered_count = 0
+        for _, ex in pos_examples:
+            if predicts([rule], ex, features, target_pred):
+                covered_count += 1
+        rule_coverage.append((rule, covered_count))
+
+    # Sort rules by coverage count in descending order and take top 3
+    rule_coverage.sort(key=lambda x: x[1], reverse=True)
+    top_3 = []
+    for (head, conds), covered in rule_coverage[:3]:
+        cov_rate = covered / n_pos if n_pos else 0.0
+        top_3.append({
+            "head": head,
+            "conds": conds,
+            "covered": covered,
+            "coverage_rate": cov_rate,
+            "n_pos": n_pos
+        })
+
+    return top_3
+
+
+# Evaluate all combinations of dataset, model_type, aleph_preset in base_outdir
+
+
+def evaluate_all_top_rules(base_outdir: str, datasets: List[str], model_types: List[str], aleph_presets: List[str]):
+    for dataset in datasets:
+        for model_type in model_types:
+            for aleph_preset in aleph_presets:
+                folder = os.path.join(
+                    base_outdir, dataset, model_type, aleph_preset)
+                if not os.path.exists(folder):
+                    print(f"Folder {folder} does not exist. Skipping.")
+                    continue
+                try:
+                    top3 = top_rules(folder, dataset, model_type, aleph_preset)
+
+                    # JSON with coverage stats
+                    top_rules_path = os.path.join(folder, "top_rules.json")
+                    with open(top_rules_path, "w") as f:
+                        json.dump(top3, f, indent=4)
+                    print(f"Top rules saved to: {top_rules_path}")
+
+                    # CSV twin (ranked)
+                    csv_path = os.path.join(folder, "top_rules.csv")
+                    with open(csv_path, "w", newline="") as f:
+                        writer = csv.DictWriter(
+                            f, fieldnames=["rank", "head", "covered", "coverage_rate", "n_pos", "conds"])
+                        writer.writeheader()
+                        for i, r in enumerate(top3, start=1):
+                            writer.writerow({
+                                "rank": i,
+                                "head": r["head"],
+                                "covered": r["covered"],
+                                # 4 decimals as string
+                                "coverage_rate": fmt4(r["coverage_rate"]),
+                                "n_pos": r["n_pos"],
+                                "conds": "; ".join(map(str, r["conds"])) if isinstance(r["conds"], list) else str(r["conds"])
+                            })
+                    print(f"Top rules CSV saved to: {csv_path}")
+
+                except Exception as e:
+                    print(f"Error processing {folder}: {e}")
