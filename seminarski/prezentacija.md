@@ -6,11 +6,13 @@ shortauthor: "Ристић"
 institute: 'Факултет техничких наука, Универзитет у Новом Саду'
 date: '2025-10-01'
 header-includes:
+# Следеће линије су потребне за лого на главној страни и у горњем десном углу
   - \usepackage{graphicx}
   - \newcommand{\FTNLogo}{./images/ftn-logo.eps}
   - \titlegraphic{\includegraphics[height=1.8cm]{\FTNLogo}}
   - |
     \setbeamertemplate{logo}{\ifnum\thepage>1\raisebox{6.1cm}[0pt][0pt]{\makebox[\paperwidth][r]{\includegraphics[height=1.3cm]{\FTNLogo}\hspace{0cm}}}\fi}
+# Наредне линије омогућавају "анимације" у *Beamer*-у
   - \usepackage{etoolbox}
   - \beamerdefaultoverlayspecification{<+->}
   - \newcounter{itemizeDepth}
