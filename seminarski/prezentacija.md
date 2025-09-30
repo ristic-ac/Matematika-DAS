@@ -103,11 +103,13 @@ header-includes:
 - Максимум перформанси већ са 6–8 правила.
 - Фиделитет ≈ тачност, MCC ≈ 1.
 
-## Пример правила - *Mushroom* (100% прецизност)
+## Пример правила - *Mushroom*
 
 ```
+% support: 322, coverage: 0.5589, precision: 1.0000
 poisonous(A) :- odor(A, foul).
-poisonous(A) :- gill_size(A, narrow).
+% support: 265, coverage: 0.4514, precision: 1.0000
+poisonous(A) :- gill_color(A, buff).
 ```
 
 ## Резултати — *Adult*
@@ -120,15 +122,15 @@ poisonous(A) :- gill_size(A, narrow).
 - *sweet_spot*: мање правила од *sniper*, сличан квалитет.
 - *sweeper*: најмање правила, пад тачности.
 
-## Пример правила - *Adult* (100% прецизност)
+## Пример правила - *Adult*
 
 ```
+% support: 484, coverage: 0.2614, precision: 0.9814
 gt_50K(A) :- education(A, bachelors), 
-    marital_status(A, married_civ_spouse), 
-    hours_per_week(A, 41_60).
+  marital_status(A, married_civ_spouse).   
 
-gt_50K(A) :- marital_status(A, married_civ_spouse), 
-    education(A, advanced_degree).
+% support: 408, coverage: 0.1987, precision: 0.8848
+gt_50K(A) :- education(A, advanced_degree)
 ```
 
 ## Закључак
