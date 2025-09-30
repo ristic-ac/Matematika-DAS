@@ -186,8 +186,8 @@ Rezultat: `all_results.json`.
 
 ## Licenca 📄
 
-Ovaj projekat trenutno nema zvaničnu licencu.  
-Za korišćenje ili distribuciju, kontaktirajte autora.
+Ovaj projekat je licenciran pod MIT licencom.  
+Detalje možete pronaći u fajlu `LICENSE` u korenu repozitorijuma.
 
 ---
 
