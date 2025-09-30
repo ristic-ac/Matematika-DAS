@@ -7,10 +7,10 @@ institute: 'Факултет техничких наука, Универзите
 date: '2025-10-01'
 header-includes:
   - \usepackage{graphicx}
-  - \newcommand{\FTNLogo}{./images/ftn-logo.png}
+  - \newcommand{\FTNLogo}{./images/ftn-logo.eps}
   - \titlegraphic{\includegraphics[height=1.8cm]{\FTNLogo}}
   - |
-    \setbeamertemplate{logo}{\ifnum\thepage>1\raisebox{6.4cm}[0pt][0pt]{\makebox[\paperwidth][r]{\includegraphics[height=0.9cm]{\FTNLogo}\hspace{0cm}}}\fi}
+    \setbeamertemplate{logo}{\ifnum\thepage>1\raisebox{6.1cm}[0pt][0pt]{\makebox[\paperwidth][r]{\includegraphics[height=1.3cm]{\FTNLogo}\hspace{0cm}}}\fi}
   - \usepackage{etoolbox}
   - \beamerdefaultoverlayspecification{<+->}
   - \newcounter{itemizeDepth}
@@ -62,7 +62,7 @@ header-includes:
 
 - Библиотека за *Prolog*.
 - Индуктивно логичко програмирање (*ILP*).
-- Улаз: позитивни/негативни примери + **BK** + **bias** (modeh/modeb).
+- Улаз: позитивни/негативни примери + ***BK*** + ***bias*** (`modeh`/`modeb`).
 - Излаз: **скуп правила који покривају позитивне, и потенцијално неке негативне примере**.
 
 ## Подаци
